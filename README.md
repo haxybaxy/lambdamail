@@ -1,6 +1,6 @@
 # Lambda Mail
 
-Hello guys, This README serves as a temporary guide for the temporary mail API. I recommend downloading [Bruno](https://www.usebruno.com/), a collaborative tool like Postman tbut better. If you download Bruno and open the `bruno` folder in this repository, you’ll be able to view all the requests I’ve created for this API.
+Hello guys, This README serves as a temporary guide for the temporary mail API. I recommend downloading [Bruno](https://www.usebruno.com/), a collaborative tool like Postman but better. If you download Bruno and open the `bruno` folder in this repository, you’ll be able to view all the requests I’ve created for this API.
 
 The official documentation for using the API is available [here](https://docs.mail.tm/). However, you can follow along with the instructions below for a practical example in Bruno.
 
