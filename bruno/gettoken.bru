@@ -1,0 +1,18 @@
+meta {
+  name: gettoken
+  type: http
+  seq: 4
+}
+
+post {
+  url: https://api.mail.tm/token
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "address": "zaidsaheb@livinitlarge.net",
+    "password": "strongpassword!"
+  }
+}

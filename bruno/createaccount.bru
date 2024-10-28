@@ -1,0 +1,18 @@
+meta {
+  name: createaccount
+  type: http
+  seq: 3
+}
+
+post {
+  url: https://api.mail.tm/accounts
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "address": "zaidsaheb@livinitlarge.net",
+    "password": "strongpassword!"
+  }
+}

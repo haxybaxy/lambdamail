@@ -1,0 +1,19 @@
+meta {
+  name: getinbox
+  type: http
+  seq: 5
+}
+
+get {
+  url: https://api.mail.tm/messages?page=1
+  body: json
+  auth: none
+}
+
+params:query {
+  page: 1
+}
+
+headers {
+  Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJpYXQiOjE3MzAxNDU3OTMsInJvbGVzIjpbIlJPTEVfVVNFUiJdLCJhZGRyZXNzIjoiemFpZHNhaGViQGxpdmluaXRsYXJnZS5uZXQiLCJpZCI6IjY3MWZlZDhmYzc0N2IxMWMzNDA1MzExYiIsIm1lcmN1cmUiOnsic3Vic2NyaWJlIjpbIi9hY2NvdW50cy82NzFmZWQ4ZmM3NDdiMTFjMzQwNTMxMWIiXX19.KY78YXWIzX0BZI0u6P5jMFJM1hyLkDNstmh9ZkkFV-3aJo-MWdOBEZBXfRP5_rvuLs6H6JcTAPSWcBu4DTVSZA
+}
