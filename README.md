@@ -129,4 +129,32 @@ Which returns the inbox!
 ```
 
 
+## Installation of `restclient-cpp`
+
+I Tried installing 'restclient-cpp' via Homebrew but it wasn’t available there, so I cloned it directly from GitHub and built it from source - These are the steps to do that:
+
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/mrtazz/restclient-cpp.git
+
+2. **Navogate to the Directory**:
+    ```bash
+   cd restclient-cpp
+
+4. **Ensure Dependencies**:
+- restclient-cpp requires libcurl as a dependency. You can install it via Homebrew if it’s not already installed:
+    ```bash
+    brew install curl
+
+1. **Build and Install:**
+-  Run the following commands to build and install restclient-cpp:
+    ```bash
+    mkdir build
+    cd build
+    cmake ..
+    make
+    sudo make install
+
+1. **Verify Installation**: 
+- After installation, restclient-cpp should be installed in /usr/local/lib, with headers in /usr/local/include/restclient-cpp. You can verify this by checking for librestclient-cpp.dylib in /usr/local/lib.
  
