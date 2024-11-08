@@ -40,6 +40,8 @@ std::string authenticate(const std::string& email, const std::string& password) 
             std::istringstream iss(response);
             if (Json::parseFromStream(readerBuilder, iss, &jsonData, &errs)) {
                 token = jsonData["token"].asString();
+                std::cout << "Token:" << token << "\n" << std::endl;
+                std::cout << "Mail Adress:" << email << "\n" << std::endl;
             } else {
                 std::cerr << "Failed to parse token from response" << std::endl;
             }
@@ -115,5 +117,6 @@ int main() {
 
     return 0;
 }
+
 /*g++ -o check_inbox_with_curl check_inbox_with_curl.cpp -lcurl -I/opt/homebrew/Cellar/jsoncpp/1.9.6/include -L/opt/homebrew/Cellar/jsoncpp/1.9.6/lib -ljsoncpp -std=c++11
 ./check_inbox_with_curl*/
