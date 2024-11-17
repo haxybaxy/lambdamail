@@ -105,3 +105,6 @@ int main() {
 
     return 0;
 }
+
+/*g++ -o get_domain get_domain.cpp -lcurl -I/opt/homebrew/Cellar/jsoncpp/1.9.6/include -L/opt/homebrew/Cellar/jsoncpp/1.9.6/lib -ljsoncpp -std=c++11 -L/path/to/restclient/lib -lrestclient-cpp
+./get_domain*/
