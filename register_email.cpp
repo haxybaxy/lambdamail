@@ -1,47 +1,100 @@
 #include <iostream>
 #include <restclient-cpp/restclient.h>
 #include <json/json.h>
-#include <ctime>
 
-// Function to generate a random username
-std::string generateRandomUsername() {
-    const int length = 8;  // Length of the username
-    std::string username;
-    srand(time(0));  // Seed for randomness
-    for (int i = 0; i < length; i++) {
-        char c = 'a' + rand() % 26;  // Random lowercase letter
-        username += c;
+// Function to fetch an available domain dynamically
+std::string getAvailableDomain() {
+    std::string url = "https://api.mail.tm/domains";
+    RestClient::Response response = RestClient::get(url);
+
+    if (response.code != 200) {
+        std::cerr << "Failed to fetch domains. Error code: " << response.code << std::endl;
+        return "";
     }
-    return username;
-}
 
-// Function to register the email with Mail.tm
-std::string registerEmail(const std::string& domain) {
-    std::string username = generateRandomUsername();
-    std::string email = username + "@" + domain;
+    // Parse the JSON response
+    Json::CharReaderBuilder readerBuilder;
+    Json::Value jsonData;
+    std::string errors;
+    std::istringstream responseStream(response.body);
 
-    // Prepare the JSON payload for the POST request
-    Json::Value requestData;
-    requestData["address"] = email;
-    requestData["password"] = "temporary_password";  // Using a default password
+    if (!Json::parseFromStream(readerBuilder, responseStream, &jsonData, &errors)) {
+        std::cerr << "Error parsing domains JSON: " << errors << std::endl;
+        return "";
+    }
 
-    Json::StreamWriterBuilder writer;
-    std::string requestBody = Json::writeString(writer, requestData);
-
-    // Send the POST request to register the email
-    RestClient::Response response = RestClient::post("https://api.mail.tm/accounts", "application/json", requestBody);
-
-    if (response.code == 201) {
-        std::cout << "Email registered successfully: " << email << std::endl;
-        return email;
+    // Retrieve the first domain in the list
+    if (!jsonData["hydra:member"].empty()) {
+        std::string domain = jsonData["hydra:member"][0]["domain"].asString();
+        std::cout << "Using domain: " << domain << std::endl;
+        return domain;
     } else {
-        std::cerr << "Failed to register email. Response code: " << response.code << std::endl;
+        std::cerr << "No domains found in the response." << std::endl;
         return "";
     }
 }
 
+// Function to register the email with Mail.tm
+std::string registerEmail(const std::string& domain) {
+    while (true) {
+        std::string username;
+
+        // Prompt the user for their desired username
+        std::cout << "Enter your desired username (before @" << domain << "): ";
+        std::cin >> username;
+
+        std::string email = username + "@" + domain;
+
+        // Prepare the JSON payload for the POST request
+        Json::Value requestData;
+        requestData["address"] = email;
+        requestData["password"] = "temporary_password";  // Default password for the account
+
+        Json::StreamWriterBuilder writer;
+        std::string requestBody = Json::writeString(writer, requestData);
+
+        // Send the POST request to register the email
+        RestClient::Response response = RestClient::post("https://api.mail.tm/accounts", "application/json", requestBody);
+
+        if (response.code == 201) {
+            std::cout << "Email registered successfully: " << email << std::endl;
+            return email;
+        } else if (response.code == 422) {
+            // Parse the error message to check if the address is already used
+            Json::CharReaderBuilder readerBuilder;
+            Json::Value responseData;
+            std::string errors;
+            std::istringstream responseStream(response.body);
+
+            if (Json::parseFromStream(readerBuilder, responseStream, &responseData, &errors)) {
+                std::string detail = responseData["detail"].asString();
+                if (detail.find("This value is already used") != std::string::npos) {
+                    std::cerr << "The email address " << email << " is already in use. Please try another username." << std::endl;
+                } else {
+                    std::cerr << "Failed to register email: " << detail << std::endl;
+                    return "";
+                }
+            } else {
+                std::cerr << "Failed to parse server response." << std::endl;
+                return "";
+            }
+        } else {
+            std::cerr << "Failed to register email. Response code: " << response.code << std::endl;
+            std::cerr << "Server response: " << response.body << std::endl;
+            return "";
+        }
+    }
+}
+
 int main() {
-    std::string domain = "livinitlarge.net";  // Example domain, replace with one retrieved earlier
+    // Dynamically fetch the available domain
+    std::string domain = getAvailableDomain();
+    if (domain.empty()) {
+        std::cerr << "Could not fetch a valid domain. Exiting." << std::endl;
+        return 1;
+    }
+
+    // Call the function to register the email
     std::string email = registerEmail(domain);
 
     if (!email.empty()) {
@@ -52,8 +105,3 @@ int main() {
 
     return 0;
 }
-
-/*to compile and run: 
-g++ -o register_email register_email.cpp -I/opt/homebrew/Cellar/jsoncpp/1.9.6/include -L/opt/homebrew/Cellar/jsoncpp/1.9.6/lib -lrestclient-cpp -ljsoncpp -std=c++11
-./register_email
-*/
