@@ -24,15 +24,7 @@ find_package(CURL REQUIRED)
 set(JSONCPP_INCLUDE_DIR "${CONDA_PREFIX}/include")
 set(JSONCPP_LIBRARY "${CONDA_PREFIX}/lib/libjsoncpp.dylib")
 
-# Set RestClient paths using conda environment
-set(RESTCLIENT_INCLUDE_DIR "${CONDA_PREFIX}/include")
-set(RESTCLIENT_LIBRARY "${CONDA_PREFIX}/lib/librestclient-cpp.dylib")
-
 # Verify paths exist
-if(NOT EXISTS "${RESTCLIENT_INCLUDE_DIR}/restclient-cpp/restclient.h")
-    message(FATAL_ERROR "restclient.h not found at ${RESTCLIENT_INCLUDE_DIR}/restclient-cpp/restclient.h. Please check if restclient-cpp is installed correctly in your conda environment")
-endif()
-
 if(NOT EXISTS "${JSONCPP_INCLUDE_DIR}/json/json.h")
     message(FATAL_ERROR "json.h not found at ${JSONCPP_INCLUDE_DIR}/json/json.h. Please check if jsoncpp is installed correctly in your conda environment")
 endif()
@@ -41,8 +33,22 @@ endif()
 message(STATUS "Conda prefix: ${CONDA_PREFIX}")
 message(STATUS "JsonCpp include: ${JSONCPP_INCLUDE_DIR}")
 message(STATUS "JsonCpp library: ${JSONCPP_LIBRARY}")
-message(STATUS "RestClient include: ${RESTCLIENT_INCLUDE_DIR}")
-message(STATUS "RestClient library: ${RESTCLIENT_LIBRARY}")
 
-# Add the src directory
-add_subdirectory(src)
+# Include directories for headers
+include_directories(${JSONCPP_INCLUDE_DIR} ${CONDA_PREFIX}/include include)
+
+# Add the library for MailTM
+add_library(MailTM STATIC src/MailTM.cpp)
+
+# Link the required libraries to MailTM
+target_link_libraries(MailTM CURL::libcurl ${JSONCPP_LIBRARY})
+
+# Add executables for get_domain, register_email, and check_inbox
+add_executable(get_domain src/get_domain.cpp)
+add_executable(register_email src/register_email.cpp)
+add_executable(check_inbox src/check_inbox.cpp)
+
+# Link MailTM and required libraries to each executable
+target_link_libraries(get_domain MailTM)
+target_link_libraries(register_email MailTM)
+target_link_libraries(check_inbox MailTM)
