@@ -165,14 +165,14 @@ I Tried installing 'restclient-cpp' via Homebrew but it wasn’t available there
    - Download from [https://docs.conda.io/en/latest/miniconda.html](https://docs.conda.io/en/latest/miniconda.html)
    - Or install with: `brew install --cask miniconda` (on macOS)
 
-2. Run the setup script:
-```bash
-./setup.sh
-```
-
-3. Activate the environment:
+2. Activate the environment:
 ```bash
 conda activate lambdamail
+```
+
+3. Run the setup script:
+```bash
+./setup.sh
 ```
 
 4. Build the project:
@@ -184,3 +184,5 @@ make
 ```
 
 The executables will be in the `build/bin` directory.
+
+
