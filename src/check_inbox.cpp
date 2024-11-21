@@ -5,6 +5,9 @@
 #include <set>
 #include <chrono>
 
+//TODO: make it delete the email when you press x (or give you the option)
+
+
 // Function to monitor user input
 void monitorInput(std::atomic<bool>& running) {
     std::string input;

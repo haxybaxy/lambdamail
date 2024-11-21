@@ -1,6 +1,10 @@
 #include "MailTM.h"
 #include <iostream>
 
+
+//TODO: Improve the error handling here, make it print if the user name is already taken
+
+
 int main() {
     MailTM mailTm;
     std::string username, password;
