@@ -35,6 +35,12 @@ int main() {
         return 1;
     }
 
+    auto [accountSuccess, accountId] = mailTm.getAccountId(token);
+    if (!accountSuccess) {
+        std::cerr << "Failed to get account ID: " << accountId << std::endl;
+        return 1;
+    }
+
     std::cout << "Checking inbox (Type 'x' to stop, 'delete' to delete account)..." << std::endl;
 
     std::atomic<bool> running(true);
@@ -48,8 +54,21 @@ int main() {
         for (const auto& message : messages) {
             std::string messageId = message["id"].asString();
             if (printedMessages.find(messageId) == printedMessages.end()) {
+                Json::Value fullMessage = mailTm.getMessage(token, messageId);
+
                 std::cout << "From: " << message["from"]["address"].asString() << std::endl;
                 std::cout << "Subject: " << message["subject"].asString() << std::endl;
+
+                if (message.isMember("intro")) {
+                    std::cout << "Preview: " << message["intro"].asString() << std::endl;
+                }
+
+                if (fullMessage.isMember("text")) {
+                    std::cout << "Body: " << fullMessage["text"].asString() << std::endl;
+                } else if (fullMessage.isMember("html")) {
+                    std::cout << "Body (HTML): " << fullMessage["html"].asString() << std::endl;
+                }
+
                 std::cout << "-------------------" << std::endl;
                 printedMessages.insert(messageId);
             }
@@ -62,11 +81,11 @@ int main() {
     }
 
     if (deleteAccount) {
-        auto [deleteSuccess, message] = mailTm.deleteAccount(token);
+        auto [deleteSuccess, message] = mailTm.deleteAccount(token, accountId);
         if (deleteSuccess) {
-            std::cout << "Account deleted successfully: " << message << std::endl;
+            std::cout << "Account deleted successfully" << std::endl;
         } else {
-            std::cerr << "Failed to delete email account." << std::endl;
+            std::cerr << "Failed to delete email account: " << message << std::endl;
         }
     }
 
