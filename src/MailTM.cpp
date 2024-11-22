@@ -36,6 +36,8 @@ std::string MailTM::sendRequest(const std::string& url, const std::string& metho
 
     if (method == "POST") {
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload.c_str());
+    } else if (method == "DELETE") {
+        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
     }
 
     CURLcode res = curl_easy_perform(curl);
@@ -63,9 +65,9 @@ std::string MailTM::getAvailableDomain() {
     return "";
 }
 
-std::string MailTM::registerEmail(const std::string& username, const std::string& password) {
+std::pair<bool, std::string> MailTM::registerEmail(const std::string& username, const std::string& password) {
     std::string domain = getAvailableDomain();
-    if (domain.empty()) return "";
+    if (domain.empty()) return {false, "No available domains"};
 
     std::string email = username + "@" + domain;
     Json::Value requestData;
@@ -82,15 +84,16 @@ std::string MailTM::registerEmail(const std::string& username, const std::string
     std::string errors;
 
     if (Json::parseFromStream(reader, stream, &jsonData, &errors)) {
-        if (jsonData["id"].isString()) {
-            std::cout << "Email registered successfully: " << email << std::endl;
-            return email;
+        if (jsonData.isMember("id")) {
+            return {true, email};
+        } else if (jsonData.isMember("detail")) {
+            return {false, jsonData["detail"].asString()};
         }
     }
-    return "";
+    return {false, "Unknown error occurred during registration"};
 }
 
-std::string MailTM::authenticate(const std::string& email, const std::string& password) {
+std::pair<bool, std::string> MailTM::authenticate(const std::string& email, const std::string& password) {
     Json::Value requestData;
     requestData["address"] = email;
     requestData["password"] = password;
@@ -105,9 +108,13 @@ std::string MailTM::authenticate(const std::string& email, const std::string& pa
     std::string errors;
 
     if (Json::parseFromStream(reader, stream, &jsonData, &errors)) {
-        return jsonData["token"].asString();
+        if (jsonData.isMember("token")) {
+            return {true, jsonData["token"].asString()};
+        } else if (jsonData.isMember("detail")) {
+            return {false, jsonData["detail"].asString()};
+        }
     }
-    return "";
+    return {false, "Authentication failed"};
 }
 
 std::vector<Json::Value> MailTM::checkInbox(const std::string& token) {
@@ -124,4 +131,19 @@ std::vector<Json::Value> MailTM::checkInbox(const std::string& token) {
         }
     }
     return messages;
+}
+
+std::pair<bool, std::string> MailTM::deleteAccount(const std::string& token) {
+    std::string response = sendRequest("https://api.mail.tm/me", "DELETE", "", token);
+    Json::Value jsonData;
+    Json::CharReaderBuilder reader;
+    std::istringstream stream(response);
+    std::string errors;
+
+    if (Json::parseFromStream(reader, stream, &jsonData, &errors)) {
+        if (jsonData.isMember("message")) {
+            return {true, jsonData["message"].asString()};
+        }
+    }
+    return {false, "Failed to delete email account"};
 }

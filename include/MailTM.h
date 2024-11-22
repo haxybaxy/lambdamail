@@ -11,9 +11,10 @@ public:
     ~MailTM();
 
     std::string getAvailableDomain();
-    std::string registerEmail(const std::string& username, const std::string& password);
-    std::string authenticate(const std::string& email, const std::string& password);
+    std::pair<bool, std::string> registerEmail(const std::string& username, const std::string& password);
+    std::pair<bool, std::string> authenticate(const std::string& email, const std::string& password);
     std::vector<Json::Value> checkInbox(const std::string& token);
+    std::pair<bool, std::string> deleteAccount(const std::string& token);
 
 private:
     static size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp);

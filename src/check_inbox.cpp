@@ -5,12 +5,15 @@
 #include <set>
 #include <chrono>
 
-// Function to monitor user input
-void monitorInput(std::atomic<bool>& running) {
+void monitorInput(std::atomic<bool>& running, std::atomic<bool>& deleteAccount) {
     std::string input;
     while (running) {
         std::cin >> input;
-        if (input == "x" || input == "X") { // User types 'x' or 'X' to terminate
+        if (input == "x" || input == "X") {
+            running = false;
+            break;
+        } else if (input == "delete") {
+            deleteAccount = true;
             running = false;
             break;
         }
@@ -26,48 +29,45 @@ int main() {
     std::cout << "Enter your password: ";
     std::cin >> password;
 
-    // Authenticate and get the token
-    std::string token = mailTm.authenticate(email, password);
-    if (token.empty()) {
-        std::cerr << "Authentication failed." << std::endl;
+    auto [authSuccess, token] = mailTm.authenticate(email, password);
+    if (!authSuccess) {
+        std::cerr << "Authentication failed: " << token << std::endl;
         return 1;
     }
 
-    std::cout << "Checking inbox (Type 'x' to stop)..." << std::endl;
+    std::cout << "Checking inbox (Type 'x' to stop, 'delete' to delete account)..." << std::endl;
 
-    std::set<std::string> printedMessages; // Set to store IDs of already printed messages
-    std::atomic<bool> running(true);       // Atomic flag to control the loop
+    std::atomic<bool> running(true);
+    std::atomic<bool> deleteAccount(false);
+    std::set<std::string> printedMessages;
 
-    // Start the input monitoring thread
-    std::thread inputThread(monitorInput, std::ref(running));
+    std::thread inputThread(monitorInput, std::ref(running), std::ref(deleteAccount));
 
-    // Main loop to check inbox
     while (running) {
-        // Get messages from inbox
         auto messages = mailTm.checkInbox(token);
-
-        // Iterate through messages and print only new ones
         for (const auto& message : messages) {
             std::string messageId = message["id"].asString();
             if (printedMessages.find(messageId) == printedMessages.end()) {
-                // Print the email
                 std::cout << "From: " << message["from"]["address"].asString() << std::endl;
                 std::cout << "Subject: " << message["subject"].asString() << std::endl;
-                std::cout << "Preview: " << message["intro"].asString() << std::endl;
                 std::cout << "-------------------" << std::endl;
-
-                // Add the message ID to the set
                 printedMessages.insert(messageId);
             }
         }
-
-        // Wait for 10 seconds before checking again
         std::this_thread::sleep_for(std::chrono::seconds(10));
     }
 
-    // Clean up the input thread
     if (inputThread.joinable()) {
         inputThread.join();
+    }
+
+    if (deleteAccount) {
+        auto [deleteSuccess, message] = mailTm.deleteAccount(token);
+        if (deleteSuccess) {
+            std::cout << "Account deleted successfully: " << message << std::endl;
+        } else {
+            std::cerr << "Failed to delete email account." << std::endl;
+        }
     }
 
     std::cout << "Exiting inbox check..." << std::endl;

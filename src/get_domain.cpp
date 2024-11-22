@@ -1,6 +1,7 @@
 #include "MailTM.h"
 #include <iostream>
 
+
 int main() {
     MailTM mailTm;
     std::string domain = mailTm.getAvailableDomain();
