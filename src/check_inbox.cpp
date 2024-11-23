@@ -5,6 +5,7 @@
 #include <set>
 #include <chrono>
 
+
 void monitorInput(std::atomic<bool>& running, std::atomic<bool>& deleteAccount) {
     std::string input;
     while (running) {
