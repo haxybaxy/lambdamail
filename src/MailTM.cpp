@@ -1,15 +1,7 @@
 #include "MailTM.h"
-#include <curl/curl.h>
-#include <iostream>
+#include "CurlWrapper.h"
 #include <sstream>
-
-MailTM::MailTM() {
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-}
-
-MailTM::~MailTM() {
-    curl_global_cleanup();
-}
+#include <iostream>
 
 size_t MailTM::WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
     ((std::string*)userp)->append((char*)contents, size * nmemb);
@@ -18,40 +10,38 @@ size_t MailTM::WriteCallback(void* contents, size_t size, size_t nmemb, void* us
 
 std::string MailTM::sendRequest(const std::string& url, const std::string& method,
                                 const std::string& payload, const std::string& authToken) {
-    CURL* curl = curl_easy_init();
-    if (!curl) return "";
+    try {
+        CurlWrapper curl;
+        std::string response;
 
-    std::string response;
-    struct curl_slist* headers = nullptr;
-    headers = curl_slist_append(headers, "Content-Type: application/json");
+        curl.setOption(CURLOPT_URL, url.c_str());
+        curl.setOption(CURLOPT_WRITEFUNCTION, WriteCallback); // Use the overloaded function
+        curl.setOption(CURLOPT_WRITEDATA, &response);
 
-    if (!authToken.empty()) {
-        headers = curl_slist_append(headers, ("Authorization: Bearer " + authToken).c_str());
+        if (!authToken.empty()) {
+            curl.addHeader("Authorization: Bearer " + authToken);
+        }
+        curl.addHeader("Content-Type: application/json");
+
+        if (method == "POST") {
+            curl.setOption(CURLOPT_POSTFIELDS, payload.c_str());
+        } else if (method == "DELETE") {
+            curl.setOption(CURLOPT_CUSTOMREQUEST, "DELETE");
+        }
+
+        CURLcode res = curl.perform();
+        if (res != CURLE_OK) {
+            std::cerr << "CURL error: " << curl_easy_strerror(res) << std::endl;
+        }
+
+        return response;
+    } catch (const std::exception& e) {
+        std::cerr << "Error in sendRequest: " << e.what() << std::endl;
+        return "";
     }
-
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
-    if (method == "POST") {
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, payload.c_str());
-    } else if (method == "DELETE") {
-        curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
-    }
-
-    CURLcode res = curl_easy_perform(curl);
-    if (res != CURLE_OK) {
-        std::cerr << "CURL error: " << curl_easy_strerror(res) << std::endl;
-    }
-
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-    return response;
 }
-
 std::string MailTM::getAvailableDomain() {
-    std::string response = sendRequest("https://api.mail.tm/domains", "GET");
+    std::string response = sendRequest(baseUrl + "/domains", "GET");
     Json::Value jsonData;
     Json::CharReaderBuilder reader;
     std::istringstream stream(response);
@@ -65,65 +55,64 @@ std::string MailTM::getAvailableDomain() {
     return "";
 }
 
-std::pair<bool, std::string> MailTM::registerEmail(const std::string& email, const std::string& password) {
+std::optional<std::string> MailTM::registerEmail(const std::string& email, const std::string& password) {
     Json::Value root;
     root["address"] = email;
     root["password"] = password;
 
-    Json::FastWriter writer;
-    std::string jsonStr = writer.write(root);
+    Json::StreamWriterBuilder writer;
+    std::string jsonStr = Json::writeString(writer, root);
 
     std::string response = sendRequest(baseUrl + "/accounts", "POST", jsonStr);
 
+    Json::CharReaderBuilder reader;
     Json::Value jsonResponse;
-    Json::Reader reader;
-    if (!reader.parse(response, jsonResponse)) {
-        return {false, "Failed to parse response"};
-    }
+    std::string errors;
 
-    // Check for errors in the response
-    if (jsonResponse.isMember("violations")) {
-        std::string errorMsg;
-        for (const auto& violation : jsonResponse["violations"]) {
-            errorMsg += violation["propertyPath"].asString() + ": " +
-                       violation["message"].asString() + "\n";
-        }
-        return {false, errorMsg};
+    std::istringstream stream(response);
+    if (!Json::parseFromStream(reader, stream, &jsonResponse, &errors)) {
+        std::cerr << "Failed to parse registerEmail response: " << errors << std::endl;
+        return std::nullopt;
     }
 
     if (jsonResponse.isMember("id")) {
-        return {true, "Success"};
+        return jsonResponse["id"].asString();
     }
 
-    return {false, "Unknown error occurred"};
+    return std::nullopt;
 }
 
-std::pair<bool, std::string> MailTM::authenticate(const std::string& email, const std::string& password) {
-    Json::Value requestData;
-    requestData["address"] = email;
-    requestData["password"] = password;
+std::optional<std::string> MailTM::authenticate(const std::string& email, const std::string& password) {
+    Json::Value payload;
+    payload["address"] = email;
+    payload["password"] = password;
 
     Json::StreamWriterBuilder writer;
-    std::string payload = Json::writeString(writer, requestData);
+    std::string payloadStr = Json::writeString(writer, payload);
 
-    std::string response = sendRequest("https://api.mail.tm/token", "POST", payload);
-    Json::Value jsonData;
-    Json::CharReaderBuilder reader;
-    std::istringstream stream(response);
-    std::string errors;
+    try {
+        std::string response = sendRequest(baseUrl + "/token", "POST", payloadStr);
+        Json::CharReaderBuilder reader;
+        Json::Value jsonResponse;
+        std::string errors;
 
-    if (Json::parseFromStream(reader, stream, &jsonData, &errors)) {
-        if (jsonData.isMember("token")) {
-            return {true, jsonData["token"].asString()};
-        } else if (jsonData.isMember("detail")) {
-            return {false, jsonData["detail"].asString()};
+        std::istringstream ss(response);
+        if (!Json::parseFromStream(reader, ss, &jsonResponse, &errors)) {
+            throw std::runtime_error("Failed to parse authentication response: " + errors);
         }
+
+        if (jsonResponse.isMember("token")) {
+            return jsonResponse["token"].asString();
+        }
+        return std::nullopt;
+    } catch (const std::exception& e) {
+        std::cerr << "Authentication error: " << e.what() << std::endl;
+        return std::nullopt;
     }
-    return {false, "Authentication failed"};
 }
 
 std::vector<Json::Value> MailTM::checkInbox(const std::string& token) {
-    std::string response = sendRequest("https://api.mail.tm/messages", "GET", "", token);
+    std::string response = sendRequest(baseUrl + "/messages", "GET", "", token);
     Json::Value jsonData;
     Json::CharReaderBuilder reader;
     std::istringstream stream(response);
@@ -138,77 +127,46 @@ std::vector<Json::Value> MailTM::checkInbox(const std::string& token) {
     return messages;
 }
 
-std::pair<bool, std::string> MailTM::deleteAccount(const std::string& token, const std::string& accountId) {
-    CURL* curl = curl_easy_init();
-    if (!curl) {
-        return {false, "Failed to initialize CURL"};
+std::optional<std::string> MailTM::deleteAccount(const std::string& token, const std::string& accountId) {
+    std::string url = baseUrl + "/accounts/" + accountId;
+    std::string response = sendRequest(url, "DELETE", "", token);
+
+    if (response.empty()) {
+        return "Account deleted successfully";
     }
 
-    std::string url = this->baseUrl + "/accounts/" + accountId;
-    struct curl_slist* headers = NULL;
-    headers = curl_slist_append(headers, ("Authorization: Bearer " + token).c_str());
-
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "DELETE");
-
-    CURLcode res = curl_easy_perform(curl);
-    long http_code = 0;
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &http_code);
-
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-
-    if (res != CURLE_OK) {
-        return {false, curl_easy_strerror(res)};
-    }
-
-    if (http_code == 204) {
-        return {true, "Account deleted successfully"};
-    } else {
-        return {false, "Unexpected response code: " + std::to_string(http_code)};
-    }
+    return std::nullopt;
 }
 
-std::pair<bool, std::string> MailTM::getAccountId(const std::string& token) {
-    CURL* curl = curl_easy_init();
-    if (!curl) {
-        return {false, "Failed to initialize CURL"};
-    }
+std::optional<std::string> MailTM::getAccountId(const std::string& token) {
+    std::string response = sendRequest(baseUrl + "/me", "GET", "", token);
 
-    std::string url = this->baseUrl + "/me";
-    struct curl_slist* headers = NULL;
-    headers = curl_slist_append(headers, ("Authorization: Bearer " + token).c_str());
-
-    std::string response;
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-
-    CURLcode res = curl_easy_perform(curl);
-    curl_slist_free_all(headers);
-    curl_easy_cleanup(curl);
-
-    if (res != CURLE_OK) {
-        return {false, curl_easy_strerror(res)};
-    }
-
+    Json::CharReaderBuilder reader;
     Json::Value root;
-    Json::Reader reader;
-    if (!reader.parse(response, root)) {
-        return {false, "Failed to parse response"};
+    std::string errors;
+
+    std::istringstream stream(response);
+    if (!Json::parseFromStream(reader, stream, &root, &errors)) {
+        std::cerr << "Failed to parse getAccountId response: " << errors << std::endl;
+        return std::nullopt;
     }
 
-    return {true, root["id"].asString()};
+    if (root.isMember("id")) {
+        return root["id"].asString();
+    }
+
+    return std::nullopt;
 }
 
 Json::Value MailTM::getMessage(const std::string& token, const std::string& messageId) {
     std::string response = sendRequest(baseUrl + "/messages/" + messageId, "GET", "", token);
 
     Json::Value jsonResponse;
-    Json::Reader reader;
-    if (!reader.parse(response, jsonResponse)) {
+    Json::CharReaderBuilder reader;
+    std::string errors;
+
+    std::istringstream stream(response);
+    if (!Json::parseFromStream(reader, stream, &jsonResponse, &errors)) {
         return Json::Value();
     }
 

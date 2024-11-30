@@ -2,10 +2,6 @@
 #include <iostream>
 #include <string>
 
-
-//TODO: Improve the error handling here, make it print if the user name is already taken
-
-
 int main() {
     MailTM mailTm;
     std::string domain = mailTm.getAvailableDomain();
@@ -24,18 +20,15 @@ int main() {
         std::cout << "Enter your desired password: ";
         std::cin >> password;
 
-        // Combine username and domain
         std::string fullEmail = username + "@" + domain;
         std::cout << "Attempting to register email: " << fullEmail << std::endl;
 
-        // Attempt to register the email
-        auto [success, message] = mailTm.registerEmail(fullEmail, password);
-        if (success) {
+        auto result = mailTm.registerEmail(fullEmail, password);
+        if (result) {
             std::cout << "Registered email: " << fullEmail << std::endl;
-            break; // Exit the loop if the email is successfully created
+            break;
         } else {
-            std::cerr << "Failed to register email: " << message << std::endl;
-            std::cout << "Please try again.\n";
+            std::cerr << "Failed to register email. Please try again." << std::endl;
         }
     }
 

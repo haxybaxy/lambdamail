@@ -2,9 +2,9 @@
 #include <iostream>
 #include <thread>
 #include <atomic>
-#include <set>
+#include <unordered_set>
 #include <chrono>
-
+using namespace std::chrono_literals; // Enable chrono literals like 10s
 
 void monitorInput(std::atomic<bool>& running, std::atomic<bool>& deleteAccount) {
     std::string input;
@@ -30,23 +30,25 @@ int main() {
     std::cout << "Enter your password: ";
     std::cin >> password;
 
-    auto [authSuccess, token] = mailTm.authenticate(email, password);
-    if (!authSuccess) {
-        std::cerr << "Authentication failed: " << token << std::endl;
+    auto tokenOpt = mailTm.authenticate(email, password);
+    if (!tokenOpt) {
+        std::cerr << "Authentication failed." << std::endl;
         return 1;
     }
+    std::string token = *tokenOpt;
 
-    auto [accountSuccess, accountId] = mailTm.getAccountId(token);
-    if (!accountSuccess) {
-        std::cerr << "Failed to get account ID: " << accountId << std::endl;
+    auto accountIdOpt = mailTm.getAccountId(token);
+    if (!accountIdOpt) {
+        std::cerr << "Failed to get account ID." << std::endl;
         return 1;
     }
+    std::string accountId = *accountIdOpt;
 
     std::cout << "Checking inbox (Type 'x' to stop, 'delete' to delete account)..." << std::endl;
 
     std::atomic<bool> running(true);
     std::atomic<bool> deleteAccount(false);
-    std::set<std::string> printedMessages;
+    std::unordered_set<std::string> printedMessages;
 
     std::thread inputThread(monitorInput, std::ref(running), std::ref(deleteAccount));
 
@@ -74,7 +76,7 @@ int main() {
                 printedMessages.insert(messageId);
             }
         }
-        std::this_thread::sleep_for(std::chrono::seconds(10));
+        std::this_thread::sleep_for(10s);
     }
 
     if (inputThread.joinable()) {
@@ -82,11 +84,11 @@ int main() {
     }
 
     if (deleteAccount) {
-        auto [deleteSuccess, message] = mailTm.deleteAccount(token, accountId);
-        if (deleteSuccess) {
-            std::cout << "Account deleted successfully" << std::endl;
+        auto deleteResult = mailTm.deleteAccount(token, accountId);
+        if (deleteResult) {
+            std::cout << "Account deleted successfully." << std::endl;
         } else {
-            std::cerr << "Failed to delete email account: " << message << std::endl;
+            std::cerr << "Failed to delete account." << std::endl;
         }
     }
 
