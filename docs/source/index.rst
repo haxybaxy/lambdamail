@@ -8,7 +8,7 @@ A section
 
 .. doxygennamespace:: MailTMAPI
 
-Docs
+
 ====
 
 .. toctree::
