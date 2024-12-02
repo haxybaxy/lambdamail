@@ -8,7 +8,9 @@ EmailClientGUI::EmailClientGUI()
     : window(sf::VideoMode(800, 600), "Temporary Email Client")
     , isEmailGenerated(false)
     , scrollOffset(0)
-    , isGenerating(false) {
+    , isGenerating(false)
+    , isCustomUsername(false)
+    , isInputActive(false) {
 
     const std::vector<std::string> fontPaths = {
         "resources/fonts/Arial.ttf",
@@ -34,36 +36,39 @@ EmailClientGUI::EmailClientGUI()
 }
 
 void EmailClientGUI::generateEmail() {
-    std::cout << "Starting email generation..." << std::endl;  // Debug output
+    std::cout << "Starting email generation..." << std::endl;
 
-    // Get available domain
     std::string domain = mailTm.getAvailableDomain();
     if (domain.empty()) {
         std::cerr << "Failed to get domain" << std::endl;
         return;
     }
-    std::cout << "Got domain: " << domain << std::endl;  // Debug output
+    std::cout << "Got domain: " << domain << std::endl;
 
-    // Generate random username
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> dis(1000, 9999);
-    std::string username = "user" + std::to_string(dis(gen));
-    password = "pass" + std::to_string(dis(gen));
+    std::string username;
+    if (isCustomUsername) {
+        username = customUsername;
+    } else {
+        // Generate random username
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> dis(1000, 9999);
+        username = "user" + std::to_string(dis(gen));
+    }
+
+    password = "pass" + std::to_string(std::random_device{}());
     email = username + "@" + domain;
 
-    std::cout << "Attempting to register: " << email << std::endl;  // Debug output
+    std::cout << "Attempting to register: " << email << std::endl;
 
-    // Register email
     auto result = mailTm.registerEmail(email, password);
     if (result) {
         accountId = *result;
         isEmailGenerated = true;
-        std::cout << "Email registered successfully!" << std::endl;  // Debug output
+        std::cout << "Email registered successfully!" << std::endl;
 
-        // Start checking inbox in a separate thread
         std::thread([this]() {
-            std::cout << "Starting inbox check thread..." << std::endl;  // Debug output
+            std::cout << "Starting inbox check thread..." << std::endl;
             checkInboxThread();
         }).detach();
     } else {
@@ -113,13 +118,45 @@ void EmailClientGUI::drawMainInterface() {
     window.draw(header);
 
     if (!isEmailGenerated) {
+        // Toggle button for custom/random username
+        sf::RectangleShape toggleButton(sf::Vector2f(200, 30));
+        toggleButton.setPosition(300, 15);
+        toggleButton.setFillColor(sf::Color(100, 149, 237));
+
+        sf::Text toggleText(isCustomUsername ? "Use Random Username" : "Use Custom Username", font, 16);
+        toggleText.setPosition(320, 20);
+        toggleText.setFillColor(sf::Color::White);
+
+        window.draw(toggleButton);
+        window.draw(toggleText);
+
+        if (isCustomUsername) {
+            // Username input box
+            sf::RectangleShape inputBox(sf::Vector2f(200, 30));
+            inputBox.setPosition(300, 55);
+            inputBox.setFillColor(isInputActive ? sf::Color::White : sf::Color(200, 200, 200));
+            window.draw(inputBox);
+
+            // Show username input
+            sf::Text usernameText(customUsername + (isInputActive ? "_" : ""), font, 16);
+            usernameText.setPosition(310, 60);
+            usernameText.setFillColor(sf::Color::Black);
+            window.draw(usernameText);
+
+            // Helper text
+            sf::Text helperText("Enter username (without @domain)", font, 14);
+            helperText.setPosition(300, 90);
+            helperText.setFillColor(sf::Color(200, 200, 200));
+            window.draw(helperText);
+        }
+
         // Generate button
-        sf::RectangleShape generateButton(sf::Vector2f(200, 50));
-        generateButton.setPosition(300, 25);
+        sf::RectangleShape generateButton(sf::Vector2f(200, 30));
+        generateButton.setPosition(520, 55);
         generateButton.setFillColor(sf::Color(100, 149, 237));
 
-        sf::Text buttonText("Generate Email", font, 20);
-        buttonText.setPosition(330, 40);
+        sf::Text buttonText("Generate Email", font, 16);
+        buttonText.setPosition(570, 60);
         buttonText.setFillColor(sf::Color::White);
 
         window.draw(generateButton);
@@ -171,20 +208,29 @@ void EmailClientGUI::drawMessages() {
 }
 
 void EmailClientGUI::handleMouseClick(int x, int y) {
-    std::cout << "Click detected at x: " << x << ", y: " << y << std::endl;  // Debug output
+    std::cout << "Click detected at x: " << x << ", y: " << y << std::endl;
 
     if (!isEmailGenerated) {
-        // Generate button coordinates
-        if (x >= 300 && x <= 500 && y >= 25 && y <= 75) {
-            std::cout << "Generating email..." << std::endl;  // Debug output
-            generateEmail();
+        // Toggle button
+        if (x >= 300 && x <= 500 && y >= 15 && y <= 45) {
+            isCustomUsername = !isCustomUsername;
+            customUsername.clear();
+            isInputActive = false;
         }
-    } else if (isEmailGenerated) {
-        // Delete button coordinates
-        if (x >= 620 && x <= 770 && y >= 20 && y <= 50) {
-            std::cout << "Deleting account..." << std::endl;  // Debug output
-            deleteAccount();
+        // Input box
+        else if (isCustomUsername && x >= 300 && x <= 500 && y >= 55 && y <= 85) {
+            isInputActive = true;
         }
+        // Generate button
+        else if (x >= 520 && x <= 720 && y >= 55 && y <= 85) {
+            if (!isCustomUsername || (isCustomUsername && !customUsername.empty())) {
+                generateEmail();
+            }
+        } else {
+            isInputActive = false;
+        }
+    } else if (x >= 620 && x <= 770 && y >= 20 && y <= 50) {
+        deleteAccount();
     }
 }
 
@@ -223,8 +269,20 @@ void EmailClientGUI::run() {
 
                 case sf::Event::MouseButtonPressed:
                     if (event.mouseButton.button == sf::Mouse::Left) {
-                        std::cout << "Mouse clicked!" << std::endl;  // Debug output
                         handleMouseClick(event.mouseButton.x, event.mouseButton.y);
+                    }
+                    break;
+
+                case sf::Event::TextEntered:
+                    if (isInputActive && !isEmailGenerated) {
+                        if (event.text.unicode == '\b') {
+                            if (!customUsername.empty()) {
+                                customUsername.pop_back();
+                            }
+                        }
+                        else if (event.text.unicode < 128 && event.text.unicode != '\r' && event.text.unicode != '\n') {
+                            customUsername += static_cast<char>(event.text.unicode);
+                        }
                     }
                     break;
 

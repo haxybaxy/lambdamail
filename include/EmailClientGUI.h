@@ -37,6 +37,11 @@ private:
     void handleScroll(float delta);
     void deleteAccount();
 
+    // Add these member variables to the private section:
+    bool isCustomUsername;
+    std::string customUsername;
+    bool isInputActive;
+
 public:
     EmailClientGUI();
     void run();
