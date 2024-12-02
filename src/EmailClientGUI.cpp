@@ -141,80 +141,99 @@ void EmailClientGUI::checkInboxThread() {
 }
 
 void EmailClientGUI::drawMainInterface() {
-    // Draw header
+    // Draw header with gradient effect
     sf::RectangleShape header(sf::Vector2f(800, 100));
-    header.setFillColor(sf::Color(70, 70, 70));
+    sf::RectangleShape headerGradient(sf::Vector2f(800, 5));
+    header.setFillColor(sf::Color(40, 44, 52));  // Darker, more professional blue
+    headerGradient.setFillColor(sf::Color(65, 105, 225));  // Royal Blue
+    headerGradient.setPosition(0, 100);
     window.draw(header);
+    window.draw(headerGradient);
 
     if (!isEmailGenerated) {
-        // Toggle button for custom/random username
-        sf::RectangleShape toggleButton(sf::Vector2f(200, 30));
-        toggleButton.setPosition(300, 15);
-        toggleButton.setFillColor(sf::Color(100, 149, 237));
+        // Center container for controls
+        sf::RectangleShape controlContainer(sf::Vector2f(600, 180));
+        controlContainer.setPosition(100, 120);
+        controlContainer.setFillColor(sf::Color(50, 54, 62));
+        window.draw(controlContainer);
+
+        // Title
+        sf::Text title("Temporary Email Generator", font, 24);
+        title.setPosition(270, 130);
+        title.setFillColor(sf::Color::White);
+        window.draw(title);
+
+        // Toggle button with better styling
+        sf::RectangleShape toggleButton(sf::Vector2f(200, 40));
+        toggleButton.setPosition(150, 180);
+        toggleButton.setFillColor(sf::Color(65, 105, 225));
 
         sf::Text toggleText(isCustomUsername ? "Use Random Username" : "Use Custom Username", font, 16);
-        toggleText.setPosition(320, 20);
+        toggleText.setPosition(170, 190);
         toggleText.setFillColor(sf::Color::White);
 
         window.draw(toggleButton);
         window.draw(toggleText);
 
         if (isCustomUsername) {
-            // Username input box
-            sf::RectangleShape inputBox(sf::Vector2f(200, 30));
-            inputBox.setPosition(300, 55);
+            // Username input box with better styling
+            sf::RectangleShape inputBox(sf::Vector2f(300, 40));
+            inputBox.setPosition(150, 230);
             inputBox.setFillColor(isInputActive ? sf::Color::White : sf::Color(200, 200, 200));
+            inputBox.setOutlineThickness(2);
+            inputBox.setOutlineColor(isInputActive ? sf::Color(65, 105, 225) : sf::Color::Transparent);
             window.draw(inputBox);
 
             // Show username input
             sf::Text usernameText(customUsername + (isInputActive ? "_" : ""), font, 16);
-            usernameText.setPosition(310, 60);
+            usernameText.setPosition(160, 240);
             usernameText.setFillColor(sf::Color::Black);
             window.draw(usernameText);
 
-            // Helper text with more detailed requirements
+            // Helper text with better formatting
             std::vector<std::string> helperLines = {
-                "Username requirements:",
-                "- Start with a letter",
-                "- At least 3 characters",
-                "- Letters, numbers, dots, _, -"
+                "• Start with a letter",
+                "• At least 3 characters",
+                "• Letters, numbers, dots, _, -"
             };
 
-            float yPos = 90;
+            float yPos = 280;
             for (const auto& line : helperLines) {
                 sf::Text helperText(line, font, 12);
-                helperText.setPosition(300, yPos);
-                helperText.setFillColor(sf::Color(200, 200, 200));
+                helperText.setPosition(150, yPos);
+                helperText.setFillColor(sf::Color(150, 150, 150));
                 window.draw(helperText);
                 yPos += 15;
             }
         }
 
-        // Generate button
-        sf::RectangleShape generateButton(sf::Vector2f(200, 30));
-        generateButton.setPosition(520, 55);
-        generateButton.setFillColor(sf::Color(100, 149, 237));
+        // Generate button with better styling
+        sf::RectangleShape generateButton(sf::Vector2f(200, 40));
+        generateButton.setPosition(450, 230);
+        generateButton.setFillColor(sf::Color(46, 204, 113));  // Green color
 
         sf::Text buttonText("Generate Email", font, 16);
-        buttonText.setPosition(570, 60);
+        float textWidth = buttonText.getLocalBounds().width;
+        buttonText.setPosition(450 + (200 - textWidth) / 2, 240);
         buttonText.setFillColor(sf::Color::White);
 
         window.draw(generateButton);
         window.draw(buttonText);
     } else {
-        // Show email address
-        sf::Text emailText(email, font, 20);
+        // Email info display
+        sf::Text emailText("Your temporary email: " + email, font, 18);
         emailText.setPosition(20, 20);
         emailText.setFillColor(sf::Color::White);
         window.draw(emailText);
 
-        // Delete account button
+        // Delete button with better styling
         sf::RectangleShape deleteButton(sf::Vector2f(150, 30));
         deleteButton.setPosition(620, 20);
-        deleteButton.setFillColor(sf::Color(200, 70, 70));
+        deleteButton.setFillColor(sf::Color(231, 76, 60));  // Red color
 
-        sf::Text deleteText("Delete Account", font, 16);
-        deleteText.setPosition(635, 25);
+        sf::Text deleteText("Delete Account", font, 14);
+        float deleteTextWidth = deleteText.getLocalBounds().width;
+        deleteText.setPosition(620 + (150 - deleteTextWidth) / 2, 25);
         deleteText.setFillColor(sf::Color::White);
 
         window.draw(deleteButton);
@@ -225,28 +244,37 @@ void EmailClientGUI::drawMainInterface() {
 void EmailClientGUI::drawMessages() {
     std::lock_guard<std::mutex> lock(messagesMutex);
     float yPos = 110 - scrollOffset;
-    activeLinks.clear(); // Clear previous links
+    activeLinks.clear();
+
+    // Message container background
+    sf::RectangleShape messagesContainer(sf::Vector2f(780, 480));
+    messagesContainer.setPosition(10, 110);
+    messagesContainer.setFillColor(sf::Color(45, 49, 57));
+    window.draw(messagesContainer);
 
     for (const auto& message : messages) {
         if (yPos >= 110 && yPos <= 540) {
-            // Message container
-            sf::RectangleShape messageBox(sf::Vector2f(780, 120));
-            messageBox.setPosition(10, yPos);
-            messageBox.setFillColor(sf::Color(60, 60, 60));
+            // Message box with better styling
+            sf::RectangleShape messageBox(sf::Vector2f(760, 120));
+            messageBox.setPosition(20, yPos);
+            messageBox.setFillColor(sf::Color(50, 54, 62));
+            messageBox.setOutlineThickness(1);
+            messageBox.setOutlineColor(sf::Color(70, 74, 82));
             window.draw(messageBox);
 
-            // From and Subject remain the same
+            // From header
             sf::Text fromText("From: " + message["from"]["address"].asString(), font, 16);
-            fromText.setPosition(20, yPos + 10);
-            fromText.setFillColor(sf::Color::White);
+            fromText.setPosition(30, yPos + 10);
+            fromText.setFillColor(sf::Color(200, 200, 200));
             window.draw(fromText);
 
+            // Subject with better contrast
             sf::Text subjectText("Subject: " + message["subject"].asString(), font, 16);
-            subjectText.setPosition(20, yPos + 35);
+            subjectText.setPosition(30, yPos + 35);
             subjectText.setFillColor(sf::Color::White);
             window.draw(subjectText);
 
-            // Body text processing
+            // Body text processing (rest of the code remains the same)
             std::string bodyText;
             if (message.isMember("text")) {
                 bodyText = message["text"].asString();
@@ -256,10 +284,10 @@ void EmailClientGUI::drawMessages() {
                 bodyText = message["intro"].asString();
             }
 
-            // Draw body text with clickable links
-            float textX = 20;
+            // Draw body text with improved formatting
+            float textX = 30;  // Increased margin
             float textY = yPos + 60;
-            float maxWidth = 740;
+            float maxWidth = 720;  // Adjusted for new margins
 
             std::vector<std::string> words = splitIntoWords(bodyText);
             std::string currentLine;
@@ -270,13 +298,12 @@ void EmailClientGUI::drawMessages() {
 
                 sf::Text testText(currentLine + " " + word, font, 14);
                 if (testText.getLocalBounds().width > maxWidth && !currentLine.empty()) {
-                    // Draw current line
                     sf::Text lineText(currentLine, font, 14);
                     lineText.setPosition(lineX, textY);
-                    lineText.setFillColor(sf::Color(200, 200, 200));
+                    lineText.setFillColor(sf::Color(180, 180, 180));
                     window.draw(lineText);
 
-                    textY += 20; // Move to next line
+                    textY += 20;
                     currentLine = word;
                     lineX = textX;
                 } else {
@@ -287,29 +314,28 @@ void EmailClientGUI::drawMessages() {
                 if (isLink) {
                     sf::Text linkText(word, font, 14);
                     linkText.setPosition(lineX, textY);
-                    linkText.setFillColor(sf::Color::Cyan);
+                    linkText.setFillColor(sf::Color(100, 149, 237));  // Softer blue for links
                     linkText.setStyle(sf::Text::Underlined);
 
-                    // Store clickable area
                     ClickableLink link;
                     link.bounds = linkText.getGlobalBounds();
                     link.url = word;
                     activeLinks.push_back(link);
 
                     window.draw(linkText);
-
                     lineX += linkText.getGlobalBounds().width + 5;
-                } else {
-                    sf::Text wordText(word + " ", font, 14);
-                    wordText.setPosition(lineX, textY);
-                    wordText.setFillColor(sf::Color(200, 200, 200));
-                    window.draw(wordText);
-
-                    lineX += wordText.getGlobalBounds().width;
                 }
             }
         }
         yPos += 130;
+    }
+
+    // Add scroll indicators if needed
+    if (messages.size() > 4) {  // If there are more messages than fit in view
+        sf::Text scrollIndicator("▼", font, 20);
+        scrollIndicator.setPosition(770, 560);
+        scrollIndicator.setFillColor(sf::Color(150, 150, 150));
+        window.draw(scrollIndicator);
     }
 }
 
@@ -363,7 +389,9 @@ std::vector<std::string> EmailClientGUI::splitIntoWords(const std::string& text)
 }
 
 void EmailClientGUI::handleMouseClick(int x, int y) {
-    // Check for link clicks
+    std::cout << "Click detected at x: " << x << ", y: " << y << std::endl;
+
+    // Check for link clicks first
     for (const auto& link : activeLinks) {
         if (link.bounds.contains(x, y)) {
             openUrl(link.url);
@@ -371,29 +399,30 @@ void EmailClientGUI::handleMouseClick(int x, int y) {
         }
     }
 
-    std::cout << "Click detected at x: " << x << ", y: " << y << std::endl;
-
     if (!isEmailGenerated) {
-        // Toggle button
-        if (x >= 300 && x <= 500 && y >= 15 && y <= 45) {
+        // Toggle button (150, 180, 350, 220)
+        if (x >= 150 && x <= 350 && y >= 180 && y <= 220) {
             isCustomUsername = !isCustomUsername;
             customUsername.clear();
             isInputActive = false;
         }
-        // Input box
-        else if (isCustomUsername && x >= 300 && x <= 500 && y >= 55 && y <= 85) {
+        // Input box (150, 230, 450, 270)
+        else if (isCustomUsername && x >= 150 && x <= 450 && y >= 230 && y <= 270) {
             isInputActive = true;
         }
-        // Generate button
-        else if (x >= 520 && x <= 720 && y >= 55 && y <= 85) {
+        // Generate button (450, 230, 650, 270)
+        else if (x >= 450 && x <= 650 && y >= 230 && y <= 270) {
             if (!isCustomUsername || (isCustomUsername && !customUsername.empty())) {
                 generateEmail();
             }
         } else {
             isInputActive = false;
         }
-    } else if (x >= 620 && x <= 770 && y >= 20 && y <= 50) {
-        deleteAccount();
+    } else {
+        // Delete button (620, 20, 770, 50)
+        if (x >= 620 && x <= 770 && y >= 20 && y <= 50) {
+            deleteAccount();
+        }
     }
 }
 
