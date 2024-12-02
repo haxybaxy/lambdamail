@@ -43,3 +43,9 @@ target_link_libraries(check_inbox
     PRIVATE
     MailTM
 )
+
+add_library(CurlWrapper STATIC CurlWrapper.cpp)
+target_include_directories(CurlWrapper PUBLIC ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(CurlWrapper PRIVATE CURL::libcurl)
+
+target_link_libraries(MailTM PRIVATE CurlWrapper)

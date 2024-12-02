@@ -41,20 +41,17 @@ include_directories(
     include
 )
 
-# Add the library for MailTM and CurlWrapper
-add_library(MailTM STATIC src/MailTM.cpp)
-add_library(CurlWrapper STATIC src/CurlWrapper.cpp)
+# Main library definitions moved to src/CMakeLists.txt for modularity
+add_subdirectory(src)
 
-# Link the required libraries to MailTM and CurlWrapper
-target_link_libraries(MailTM PRIVATE CURL::libcurl ${JSONCPP_LIBRARY})
-target_link_libraries(CurlWrapper PRIVATE CURL::libcurl)
+# Enable testing and add tests
+enable_testing()
+add_subdirectory(tests)
 
-# Add executables for get_domain, register_email, and check_inbox
-add_executable(get_domain src/get_domain.cpp)
-add_executable(register_email src/register_email.cpp)
-add_executable(check_inbox src/check_inbox.cpp)
+# Add documentation directory (if needed)
+if(EXISTS "${CMAKE_SOURCE_DIR}/docs/CMakeLists.txt")
+    add_subdirectory(docs)
+endif()
 
-# Link MailTM and CurlWrapper to executables
-target_link_libraries(get_domain MailTM CurlWrapper)
-target_link_libraries(register_email MailTM CurlWrapper)
-target_link_libraries(check_inbox MailTM CurlWrapper)
+# Print summary
+message(STATUS "Project configuration complete.")
