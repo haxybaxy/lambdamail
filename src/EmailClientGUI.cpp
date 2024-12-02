@@ -124,11 +124,12 @@ void EmailClientGUI::checkInboxThread() {
 
         {
             std::lock_guard<std::mutex> lock(messagesMutex);
-            // Only add messages we haven't seen before
             for (const auto& message : newMessages) {
                 std::string messageId = message["id"].asString();
                 if (seenMessageIds.find(messageId) == seenMessageIds.end()) {
-                    messages.push_back(message);
+                    // Get full message content
+                    Json::Value fullMessage = mailTm.getMessage(token, messageId);
+                    messages.push_back(fullMessage);  // Store full message instead
                     seenMessageIds[messageId] = true;
                 }
             }
@@ -227,22 +228,68 @@ void EmailClientGUI::drawMessages() {
 
     for (const auto& message : messages) {
         if (yPos >= 110 && yPos <= 540) {
-            sf::RectangleShape messageBox(sf::Vector2f(780, 80));
+            // Message container - make it bigger to accommodate body
+            sf::RectangleShape messageBox(sf::Vector2f(780, 120));
             messageBox.setPosition(10, yPos);
             messageBox.setFillColor(sf::Color(60, 60, 60));
             window.draw(messageBox);
 
+            // From
             sf::Text fromText("From: " + message["from"]["address"].asString(), font, 16);
             fromText.setPosition(20, yPos + 10);
             fromText.setFillColor(sf::Color::White);
             window.draw(fromText);
 
+            // Subject
             sf::Text subjectText("Subject: " + message["subject"].asString(), font, 16);
             subjectText.setPosition(20, yPos + 35);
             subjectText.setFillColor(sf::Color::White);
             window.draw(subjectText);
+
+            // Body
+            std::string bodyText;
+            if (message.isMember("text")) {
+                bodyText = message["text"].asString();
+            } else if (message.isMember("html")) {
+                bodyText = message["html"].asString();
+            } else if (message.isMember("intro")) {
+                bodyText = message["intro"].asString();
+            }
+
+            // Truncate body if it's too long
+            if (bodyText.length() > 100) {
+                bodyText = bodyText.substr(0, 97) + "...";
+            }
+
+            sf::Text body("Body: " + bodyText, font, 14);
+            body.setPosition(20, yPos + 60);
+            body.setFillColor(sf::Color(200, 200, 200));
+
+            // Wrap text if it's too long
+            std::string wrappedText;
+            float maxWidth = 740; // Maximum width for text
+            std::string currentLine;
+            std::istringstream words(bodyText);
+            std::string word;
+
+            while (words >> word) {
+                sf::Text testText(currentLine + " " + word, font, 14);
+                if (testText.getLocalBounds().width > maxWidth && !currentLine.empty()) {
+                    wrappedText += currentLine + "\n";
+                    currentLine = word;
+                } else {
+                    if (!currentLine.empty()) currentLine += " ";
+                    currentLine += word;
+                }
+            }
+            wrappedText += currentLine;
+
+            sf::Text bodyText_("Body: " + wrappedText, font, 14);
+            bodyText_.setPosition(20, yPos + 60);
+            bodyText_.setFillColor(sf::Color(200, 200, 200));
+            window.draw(bodyText_);
         }
-        yPos += 90;
+        yPos += 130; // Increased spacing between messages
     }
 }
 
@@ -277,7 +324,8 @@ void EmailClientGUI::handleScroll(float delta) {
     scrollOffset += delta * 30;
     if (scrollOffset < 0) scrollOffset = 0;
 
-    float maxScroll = messages.size() * 90 - 430;
+    // Adjust max scroll to account for larger message boxes
+    float maxScroll = messages.size() * 130 - 430;  // Changed from 90 to 130
     if (scrollOffset > maxScroll) scrollOffset = maxScroll;
 }
 
