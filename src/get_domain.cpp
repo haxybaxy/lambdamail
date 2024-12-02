@@ -1,5 +1,8 @@
 #include "MailTM.h"
 #include <iostream>
+#include "CurlWrapper.h"
+
+using namespace MailTMAPI;
 
 // You can create an email without getting a domain, maybe we can remove this function
 

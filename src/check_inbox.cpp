@@ -4,7 +4,10 @@
 #include <atomic>
 #include <unordered_set>
 #include <chrono>
+#include "CurlWrapper.h"
+
 using namespace std::chrono_literals; // Enable chrono literals like 10s
+using namespace MailTMAPI;   
 
 void monitorInput(std::atomic<bool>& running, std::atomic<bool>& deleteAccount) {
     std::string input;

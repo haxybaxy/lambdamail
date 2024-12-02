@@ -1,5 +1,7 @@
 #include "CurlWrapper.h"
 
+
+using namespace MailTMAPI;
 CurlWrapper::CurlWrapper() : curl(curl_easy_init()), headers(nullptr) {
     if (!curl) {
         throw std::runtime_error("Failed to initialize CURL");

@@ -1,6 +1,9 @@
 #include "MailTM.h"
 #include <iostream>
 #include <string>
+#include "CurlWrapper.h"
+
+using namespace MailTMAPI;
 
 int main() {
     MailTM mailTm;

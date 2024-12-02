@@ -6,6 +6,7 @@
 #include <functional>
 #include <iostream>
 
+using namespace MailTMAPI; 
 // Helper function to generate unique usernames
 std::string generateUniqueUsername() {
     return "user_" + std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
