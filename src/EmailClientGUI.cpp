@@ -35,6 +35,22 @@ EmailClientGUI::EmailClientGUI()
     inputPrompt.setFillColor(sf::Color::White);
 }
 
+bool EmailClientGUI::isValidUsername(const std::string& username) {
+    if (username.empty() || username.length() < 3) return false;
+
+    // Check if username contains only allowed characters
+    for (char c : username) {
+        if (!std::isalnum(c) && c != '.' && c != '_' && c != '-') {
+            return false;
+        }
+    }
+
+    // Username should start with a letter
+    if (!std::isalpha(username[0])) return false;
+
+    return true;
+}
+
 void EmailClientGUI::generateEmail() {
     std::cout << "Starting email generation..." << std::endl;
 
@@ -47,9 +63,18 @@ void EmailClientGUI::generateEmail() {
 
     std::string username;
     if (isCustomUsername) {
+        // Validate custom username
+        if (!isValidUsername(customUsername)) {
+            std::cerr << "Invalid username. Username must:\n"
+                     << "- Start with a letter\n"
+                     << "- Be at least 3 characters long\n"
+                     << "- Contain only letters, numbers, dots, underscores, or hyphens"
+                     << std::endl;
+            return;
+        }
         username = customUsername;
     } else {
-        // Generate random username
+        // Generate random username (ensure it starts with a letter)
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_int_distribution<> dis(1000, 9999);
@@ -72,7 +97,10 @@ void EmailClientGUI::generateEmail() {
             checkInboxThread();
         }).detach();
     } else {
-        std::cerr << "Failed to register email" << std::endl;
+        std::cerr << "Failed to register email. Please try a different username." << std::endl;
+        if (isCustomUsername) {
+            customUsername.clear(); // Clear the invalid username
+        }
     }
 }
 
@@ -143,11 +171,22 @@ void EmailClientGUI::drawMainInterface() {
             usernameText.setFillColor(sf::Color::Black);
             window.draw(usernameText);
 
-            // Helper text
-            sf::Text helperText("Enter username (without @domain)", font, 14);
-            helperText.setPosition(300, 90);
-            helperText.setFillColor(sf::Color(200, 200, 200));
-            window.draw(helperText);
+            // Helper text with more detailed requirements
+            std::vector<std::string> helperLines = {
+                "Username requirements:",
+                "- Start with a letter",
+                "- At least 3 characters",
+                "- Letters, numbers, dots, _, -"
+            };
+
+            float yPos = 90;
+            for (const auto& line : helperLines) {
+                sf::Text helperText(line, font, 12);
+                helperText.setPosition(300, yPos);
+                helperText.setFillColor(sf::Color(200, 200, 200));
+                window.draw(helperText);
+                yPos += 15;
+            }
         }
 
         // Generate button

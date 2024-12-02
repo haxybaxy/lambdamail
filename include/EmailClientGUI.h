@@ -42,6 +42,9 @@ private:
     std::string customUsername;
     bool isInputActive;
 
+    // Add to private section:
+    bool isValidUsername(const std::string& username);
+
 public:
     EmailClientGUI();
     void run();
