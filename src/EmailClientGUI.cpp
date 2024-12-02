@@ -2,6 +2,7 @@
 #include <thread>
 #include <random>
 #include <iostream>
+#include <unordered_map>
 
 EmailClientGUI::EmailClientGUI()
     : window(sf::VideoMode(800, 600), "Temporary Email Client")
@@ -71,7 +72,7 @@ void EmailClientGUI::generateEmail() {
 }
 
 void EmailClientGUI::checkInboxThread() {
-    std::cout << "Authenticating with email: " << email << std::endl;  // Debug output
+    std::cout << "Authenticating with email: " << email << std::endl;
 
     auto tokenOpt = mailTm.authenticate(email, password);
     if (!tokenOpt) {
@@ -80,16 +81,27 @@ void EmailClientGUI::checkInboxThread() {
     }
 
     std::string token = *tokenOpt;
-    std::cout << "Authentication successful" << std::endl;  // Debug output
+    std::cout << "Authentication successful" << std::endl;
+
+    std::unordered_map<std::string, bool> seenMessageIds;
 
     while (isEmailGenerated) {
-        std::cout << "Checking for new messages..." << std::endl;  // Debug output
+        std::cout << "Checking for new messages..." << std::endl;
         auto newMessages = mailTm.checkInbox(token);
+
         {
             std::lock_guard<std::mutex> lock(messagesMutex);
-            messages = newMessages;
+            // Only add messages we haven't seen before
+            for (const auto& message : newMessages) {
+                std::string messageId = message["id"].asString();
+                if (seenMessageIds.find(messageId) == seenMessageIds.end()) {
+                    messages.push_back(message);
+                    seenMessageIds[messageId] = true;
+                }
+            }
         }
-        std::cout << "Found " << messages.size() << " messages" << std::endl;  // Debug output
+
+        std::cout << "Total messages: " << messages.size() << std::endl;
         std::this_thread::sleep_for(std::chrono::seconds(10));
     }
 }
