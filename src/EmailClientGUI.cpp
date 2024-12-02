@@ -225,75 +225,152 @@ void EmailClientGUI::drawMainInterface() {
 void EmailClientGUI::drawMessages() {
     std::lock_guard<std::mutex> lock(messagesMutex);
     float yPos = 110 - scrollOffset;
+    activeLinks.clear(); // Clear previous links
 
     for (const auto& message : messages) {
         if (yPos >= 110 && yPos <= 540) {
-            // Message container - make it bigger to accommodate body
+            // Message container
             sf::RectangleShape messageBox(sf::Vector2f(780, 120));
             messageBox.setPosition(10, yPos);
             messageBox.setFillColor(sf::Color(60, 60, 60));
             window.draw(messageBox);
 
-            // From
+            // From and Subject remain the same
             sf::Text fromText("From: " + message["from"]["address"].asString(), font, 16);
             fromText.setPosition(20, yPos + 10);
             fromText.setFillColor(sf::Color::White);
             window.draw(fromText);
 
-            // Subject
             sf::Text subjectText("Subject: " + message["subject"].asString(), font, 16);
             subjectText.setPosition(20, yPos + 35);
             subjectText.setFillColor(sf::Color::White);
             window.draw(subjectText);
 
-            // Body
+            // Body text processing
             std::string bodyText;
             if (message.isMember("text")) {
                 bodyText = message["text"].asString();
             } else if (message.isMember("html")) {
-                bodyText = message["html"].asString();
+                bodyText = stripHtmlExceptLinks(message["html"].asString());
             } else if (message.isMember("intro")) {
                 bodyText = message["intro"].asString();
             }
 
-            // Truncate body if it's too long
-            if (bodyText.length() > 100) {
-                bodyText = bodyText.substr(0, 97) + "...";
-            }
+            // Draw body text with clickable links
+            float textX = 20;
+            float textY = yPos + 60;
+            float maxWidth = 740;
 
-            sf::Text body("Body: " + bodyText, font, 14);
-            body.setPosition(20, yPos + 60);
-            body.setFillColor(sf::Color(200, 200, 200));
-
-            // Wrap text if it's too long
-            std::string wrappedText;
-            float maxWidth = 740; // Maximum width for text
+            std::vector<std::string> words = splitIntoWords(bodyText);
             std::string currentLine;
-            std::istringstream words(bodyText);
-            std::string word;
+            float lineX = textX;
 
-            while (words >> word) {
+            for (const auto& word : words) {
+                bool isLink = word.find("http://") == 0 || word.find("https://") == 0;
+
                 sf::Text testText(currentLine + " " + word, font, 14);
                 if (testText.getLocalBounds().width > maxWidth && !currentLine.empty()) {
-                    wrappedText += currentLine + "\n";
+                    // Draw current line
+                    sf::Text lineText(currentLine, font, 14);
+                    lineText.setPosition(lineX, textY);
+                    lineText.setFillColor(sf::Color(200, 200, 200));
+                    window.draw(lineText);
+
+                    textY += 20; // Move to next line
                     currentLine = word;
+                    lineX = textX;
                 } else {
                     if (!currentLine.empty()) currentLine += " ";
                     currentLine += word;
                 }
-            }
-            wrappedText += currentLine;
 
-            sf::Text bodyText_("Body: " + wrappedText, font, 14);
-            bodyText_.setPosition(20, yPos + 60);
-            bodyText_.setFillColor(sf::Color(200, 200, 200));
-            window.draw(bodyText_);
+                if (isLink) {
+                    sf::Text linkText(word, font, 14);
+                    linkText.setPosition(lineX, textY);
+                    linkText.setFillColor(sf::Color::Cyan);
+                    linkText.setStyle(sf::Text::Underlined);
+
+                    // Store clickable area
+                    ClickableLink link;
+                    link.bounds = linkText.getGlobalBounds();
+                    link.url = word;
+                    activeLinks.push_back(link);
+
+                    window.draw(linkText);
+
+                    lineX += linkText.getGlobalBounds().width + 5;
+                } else {
+                    sf::Text wordText(word + " ", font, 14);
+                    wordText.setPosition(lineX, textY);
+                    wordText.setFillColor(sf::Color(200, 200, 200));
+                    window.draw(wordText);
+
+                    lineX += wordText.getGlobalBounds().width;
+                }
+            }
         }
-        yPos += 130; // Increased spacing between messages
+        yPos += 130;
     }
 }
 
+std::string EmailClientGUI::stripHtmlExceptLinks(const std::string& html) {
+    std::string result;
+    bool inTag = false;
+    bool inLink = false;
+    std::string currentLink;
+
+    for (size_t i = 0; i < html.length(); ++i) {
+        if (html[i] == '<') {
+            inTag = true;
+            // Check if it's a link
+            if (html.substr(i, 9) == "<a href=\"") {
+                inLink = true;
+                i += 8; // Skip to the href value
+                continue;
+            }
+        } else if (html[i] == '>') {
+            inTag = false;
+            if (inLink) {
+                result += currentLink + " ";
+                currentLink.clear();
+                inLink = false;
+            }
+            continue;
+        }
+
+        if (!inTag) {
+            if (html[i] == '&' && html.substr(i, 6) == "&nbsp;") {
+                result += " ";
+                i += 5;
+            } else {
+                result += html[i];
+            }
+        } else if (inLink && html[i] != '"') {
+            currentLink += html[i];
+        }
+    }
+    return result;
+}
+
+std::vector<std::string> EmailClientGUI::splitIntoWords(const std::string& text) {
+    std::vector<std::string> words;
+    std::istringstream iss(text);
+    std::string word;
+    while (iss >> word) {
+        words.push_back(word);
+    }
+    return words;
+}
+
 void EmailClientGUI::handleMouseClick(int x, int y) {
+    // Check for link clicks
+    for (const auto& link : activeLinks) {
+        if (link.bounds.contains(x, y)) {
+            openUrl(link.url);
+            return;
+        }
+    }
+
     std::cout << "Click detected at x: " << x << ", y: " << y << std::endl;
 
     if (!isEmailGenerated) {
@@ -389,4 +466,14 @@ void EmailClientGUI::run() {
         }
         window.display();
     }
+}
+
+void EmailClientGUI::openUrl(const std::string& url) {
+    #ifdef _WIN32
+        ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
+    #elif __APPLE__
+        system(("open " + url).c_str());
+    #else
+        system(("xdg-open " + url).c_str());
+    #endif
 }

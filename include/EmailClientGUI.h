@@ -45,6 +45,20 @@ private:
     // Add to private section:
     bool isValidUsername(const std::string& username);
 
+    // Add these new structures to help manage clickable links
+    struct ClickableLink {
+        sf::FloatRect bounds;
+        std::string url;
+    };
+
+    // Add to class private members in EmailClientGUI.h
+    std::vector<ClickableLink> activeLinks;
+
+    // Add these helper function declarations
+    std::string stripHtmlExceptLinks(const std::string& html);
+    std::vector<std::string> splitIntoWords(const std::string& text);
+    void openUrl(const std::string& url);
+
 public:
     EmailClientGUI();
     void run();
