@@ -19,6 +19,7 @@ endif()
 
 # Find required packages
 find_package(CURL REQUIRED)
+find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
 
 # Set JsonCpp paths using conda environment
 set(JSONCPP_INCLUDE_DIR "${CONDA_PREFIX}/include")
