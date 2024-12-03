@@ -29,7 +29,7 @@ The executables will be in the `build/bin` directory.
       - shows the functionality of fetching a domain from the API 
 - **./register_email**: 
       - allows you to create a temporary email and password 
-- **./check_inbow**:
+- **./check_inbox**:
       -  allows you to log into your email using the credentials created in the register_email and view the emails you recieve in your inbox and delete the account when needed
 - **./mail_client**:
       -  allows you to test out all these features with an interactive GUI
