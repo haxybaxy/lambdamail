@@ -35,3 +35,4 @@ The executables will be in the `build/bin` directory.
       -  allows you to test out all these features with an interactive GUI
 
 
+To find the documentation cd into the 'build/docs/sphinx' then use the command 'open index.html'
