@@ -360,7 +360,7 @@ std::string EmailClientGUI::stripHtmlExceptLinks(const std::string& html) {
         if (html[i] == '<') {
             inTag = true;
             // Check if it's a link
-            if (html.substr(i, 9) == "<a href=\"") {
+            if (i + 9 < html.length() && html.substr(i, 9) == "<a href=\"") {
                 inLink = true;
                 i += 8; // Skip to the href value
                 continue;
@@ -368,17 +368,29 @@ std::string EmailClientGUI::stripHtmlExceptLinks(const std::string& html) {
         } else if (html[i] == '>') {
             inTag = false;
             if (inLink) {
-                result += currentLink + " ";
-                currentLink.clear();
+                // Add the complete link to result
+                if (!currentLink.empty()) {
+                    result += currentLink + " ";
+                    currentLink.clear();
+                }
                 inLink = false;
             }
             continue;
         }
 
         if (!inTag) {
-            if (html[i] == '&' && html.substr(i, 6) == "&nbsp;") {
+            if (i + 6 <= html.length() && html.substr(i, 6) == "&nbsp;") {
                 result += " ";
                 i += 5;
+            } else if (i + 4 <= html.length() && html.substr(i, 4) == "&lt;") {
+                result += "<";
+                i += 3;
+            } else if (i + 4 <= html.length() && html.substr(i, 4) == "&gt;") {
+                result += ">";
+                i += 3;
+            } else if (i + 5 <= html.length() && html.substr(i, 5) == "&amp;") {
+                result += "&";
+                i += 4;
             } else {
                 result += html[i];
             }
@@ -386,6 +398,7 @@ std::string EmailClientGUI::stripHtmlExceptLinks(const std::string& html) {
             currentLink += html[i];
         }
     }
+
     return result;
 }
 
@@ -541,42 +554,33 @@ void EmailClientGUI::run() {
 }
 
 void EmailClientGUI::openUrl(const std::string& url) {
+    // URL encode only the pipe character, leave ampersands as is
+    std::string encodedUrl = url;
+
+    // Handle pipe character only
+    size_t pos = 0;
+    while ((pos = encodedUrl.find("|", pos)) != std::string::npos) {
+        encodedUrl.replace(pos, 1, "%7C");
+        pos += 3;
+    }
+
+    // Properly quote the entire URL
     #ifdef _WIN32
-        ShellExecuteA(NULL, "open", url.c_str(), NULL, NULL, SW_SHOWNORMAL);
+        ShellExecuteA(NULL, "open", encodedUrl.c_str(), NULL, NULL, SW_SHOWNORMAL);
     #elif __APPLE__
-        system(("open " + url).c_str());
+        std::string command = "open \"" + encodedUrl + "\"";
+        system(command.c_str());
     #else
-        system(("xdg-open " + url).c_str());
+        std::string command = "xdg-open \"" + encodedUrl + "\"";
+        system(command.c_str());
     #endif
+
+    std::cout << "Opening URL: " << encodedUrl << std::endl;
 }
 
 void EmailClientGUI::drawMessagePopup() {
     if (!isPopupOpen || selectedMessageIndex < 0 || selectedMessageIndex >= messages.size()) {
         return;
-    }
-
-    // Debug the entire message content
-    const auto& message = messages[selectedMessageIndex];
-    std::cout << "\nDEBUG - Message Structure:" << std::endl;
-    std::cout << "Message type: " << message.type() << std::endl;
-
-    if (message.isObject()) {
-        std::cout << "Message keys:" << std::endl;
-        for (const auto& key : message.getMemberNames()) {
-            std::cout << "- " << key << " (type: " << message[key].type() << ")" << std::endl;
-            if (key == "from") {
-                std::cout << "  From structure:" << std::endl;
-                if (message[key].isObject()) {
-                    for (const auto& fromKey : message[key].getMemberNames()) {
-                        std::cout << "    " << fromKey << " (type: " << message[key][fromKey].type() << ")" << std::endl;
-                    }
-                } else {
-                    std::cout << "  'from' is not an object!" << std::endl;
-                }
-            }
-        }
-    } else {
-        std::cout << "Message is not an object!" << std::endl;
     }
 
     // Draw the popup UI
@@ -591,6 +595,7 @@ void EmailClientGUI::drawMessagePopup() {
     popup.setOutlineColor(sf::Color(70, 74, 82));
     window.draw(popup);
 
+    const auto& message = messages[selectedMessageIndex];
     float yPos = 120 - popupScrollOffset;
 
     // From
@@ -605,8 +610,6 @@ void EmailClientGUI::drawMessagePopup() {
         } catch (const std::exception& e) {
             std::cout << "Error converting from address: " << e.what() << std::endl;
         }
-    } else {
-        std::cout << "Invalid 'from' structure" << std::endl;
     }
 
     // Subject
@@ -624,7 +627,7 @@ void EmailClientGUI::drawMessagePopup() {
     }
 
     // Body text
-    if (message.isMember("text")) {
+    if (message.isMember("text") && !message["text"].isNull()) {
         try {
             sf::Text bodyHeader("Message:", font, 14);
             bodyHeader.setPosition(120, yPos);
@@ -641,19 +644,43 @@ void EmailClientGUI::drawMessagePopup() {
     }
 
     // HTML content
-    if (message.isMember("html")) {
+    if (message.isMember("html") && !message["html"].isNull()) {
         try {
-            sf::Text htmlHeader("HTML Content:", font, 14);
-            htmlHeader.setPosition(120, yPos);
-            htmlHeader.setFillColor(sf::Color(150, 150, 150));
-            window.draw(htmlHeader);
-            yPos += 25;
+            // Debug the HTML content type
+            std::cout << "HTML content type: " << message["html"].type() << std::endl;
 
-            std::string htmlContent = message["html"].asString();
-            std::string strippedHtml = stripHtmlExceptLinks(htmlContent);
-            drawWrappedText(strippedHtml, 120, yPos, 540, 14, sf::Color(200, 200, 200));
+            // Handle array type HTML content
+            std::string htmlContent;
+            if (message["html"].isArray()) {
+                for (const auto& part : message["html"]) {
+                    if (part.isString()) {
+                        htmlContent += part.asString();
+                    }
+                }
+            } else if (message["html"].isString()) {
+                htmlContent = message["html"].asString();
+            } else {
+                std::cout << "Unsupported HTML content type" << std::endl;
+                return;
+            }
+
+            if (!htmlContent.empty()) {
+                sf::Text htmlHeader("HTML Content:", font, 14);
+                htmlHeader.setPosition(120, yPos);
+                htmlHeader.setFillColor(sf::Color(150, 150, 150));
+                window.draw(htmlHeader);
+                yPos += 25;
+
+                std::string strippedHtml = stripHtmlExceptLinks(htmlContent);
+                drawWrappedText(strippedHtml, 120, yPos, 540, 14, sf::Color(200, 200, 200));
+            }
         } catch (const std::exception& e) {
             std::cout << "Error converting HTML content: " << e.what() << std::endl;
+            // Print more details about the HTML content
+            if (message.isMember("html")) {
+                std::cout << "HTML content exists but couldn't be converted. Type: "
+                          << message["html"].type() << std::endl;
+            }
         }
     }
 
@@ -674,33 +701,94 @@ void EmailClientGUI::drawWrappedText(const std::string& text, float x, float y, 
     std::string currentLine;
     float lineX = x;
     float currentY = y;
+    float maxY = 460;
 
-    for (const auto& word : words) {
-        bool isLink = word.find("http://") == 0 || word.find("https://") == 0;
+    for (size_t i = 0; i < words.size(); ++i) {
+        if (currentY > maxY) {
+            sf::Text ellipsis("...", font, fontSize);
+            ellipsis.setPosition(lineX, currentY - fontSize - 6);
+            ellipsis.setFillColor(color);
+            window.draw(ellipsis);
+            break;
+        }
 
-        sf::Text testText(currentLine + " " + word, font, fontSize);
+        const std::string& word = words[i];
+        bool isLink = (word.find("http://") == 0 || word.find("https://") == 0);
+
+        // Simplified URL reconstruction
+        std::string fullWord = word;
+        if (isLink) {
+            while (i + 1 < words.size()) {
+                const std::string& next = words[i + 1];
+                if (next.empty()) break;
+
+                char firstChar = next[0];
+                if (firstChar == '?' || firstChar == '&' || firstChar == '=' ||
+                    firstChar == '/' || firstChar == '|' || firstChar == '-' ||
+                    firstChar == '_' || firstChar == '.') {
+                    fullWord += next;
+                    i++;
+                } else {
+                    bool isUrlPart = true;
+                    for (char c : next) {
+                        if (!isalnum(c) && c != '=' && c != '&' && c != '%' &&
+                            c != '+' && c != '|' && c != '-' && c != '_' && c != '.') {
+                            isUrlPart = false;
+                            break;
+                        }
+                    }
+                    if (!isUrlPart) break;
+                    fullWord += next;
+                    i++;
+                }
+            }
+        }
+
+        // Handle long words
+        if (fullWord.length() > 50) {
+            sf::Text testWord(fullWord, font, fontSize);
+            if (testWord.getLocalBounds().width > maxWidth) {
+                if (isLink) {
+                    ClickableLink link;
+                    link.url = fullWord;
+                    sf::Text linkText(fullWord, font, fontSize);
+                    linkText.setPosition(lineX, currentY);
+                    linkText.setFillColor(sf::Color(100, 149, 237));
+                    linkText.setStyle(sf::Text::Underlined);
+                    link.bounds = linkText.getGlobalBounds();
+                    activeLinks.push_back(link);
+                    window.draw(linkText);
+                    currentY += fontSize + 6;
+                    lineX = x;
+                    continue;
+                }
+            }
+        }
+
+        // Normal word wrapping
+        sf::Text testText(currentLine + (currentLine.empty() ? "" : " ") + fullWord, font, fontSize);
         if (testText.getLocalBounds().width > maxWidth && !currentLine.empty()) {
             sf::Text lineText(currentLine, font, fontSize);
             lineText.setPosition(lineX, currentY);
             lineText.setFillColor(color);
             window.draw(lineText);
             currentY += fontSize + 6;
-            currentLine = word;
+            currentLine = fullWord;
             lineX = x;
         } else {
             if (!currentLine.empty()) currentLine += " ";
-            currentLine += word;
+            currentLine += fullWord;
         }
 
         if (isLink) {
-            sf::Text linkText(word, font, fontSize);
+            sf::Text linkText(fullWord, font, fontSize);
             linkText.setPosition(lineX, currentY);
             linkText.setFillColor(sf::Color(100, 149, 237));
             linkText.setStyle(sf::Text::Underlined);
 
             ClickableLink link;
             link.bounds = linkText.getGlobalBounds();
-            link.url = word;
+            link.url = fullWord;
             activeLinks.push_back(link);
 
             window.draw(linkText);
@@ -708,8 +796,7 @@ void EmailClientGUI::drawWrappedText(const std::string& text, float x, float y, 
         }
     }
 
-    // Draw the last line if there is one
-    if (!currentLine.empty()) {
+    if (!currentLine.empty() && currentY <= maxY) {
         sf::Text lineText(currentLine, font, fontSize);
         lineText.setPosition(lineX, currentY);
         lineText.setFillColor(color);
