@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 project(LambdaMail VERSION 1.0)
 
 # Specify C++ standard
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set output directories
@@ -19,12 +19,13 @@ endif()
 
 # Find required packages
 find_package(CURL REQUIRED)
+find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
 
 # Set JsonCpp paths using conda environment
 set(JSONCPP_INCLUDE_DIR "${CONDA_PREFIX}/include")
 set(JSONCPP_LIBRARY "${CONDA_PREFIX}/lib/libjsoncpp.dylib")
 
-# Verify paths exist
+# Verify JsonCpp paths
 if(NOT EXISTS "${JSONCPP_INCLUDE_DIR}/json/json.h")
     message(FATAL_ERROR "json.h not found at ${JSONCPP_INCLUDE_DIR}/json/json.h. Please check if jsoncpp is installed correctly in your conda environment")
 endif()
@@ -35,20 +36,23 @@ message(STATUS "JsonCpp include: ${JSONCPP_INCLUDE_DIR}")
 message(STATUS "JsonCpp library: ${JSONCPP_LIBRARY}")
 
 # Include directories for headers
-include_directories(${JSONCPP_INCLUDE_DIR} ${CONDA_PREFIX}/include include)
+include_directories(
+    ${JSONCPP_INCLUDE_DIR}
+    ${CONDA_PREFIX}/include
+    include
+)
 
-# Add the library for MailTM
-add_library(MailTM STATIC src/MailTM.cpp)
+# Main library definitions moved to src/CMakeLists.txt for modularity
+add_subdirectory(src)
 
-# Link the required libraries to MailTM
-target_link_libraries(MailTM CURL::libcurl ${JSONCPP_LIBRARY})
+# Enable testing and add tests
+enable_testing()
+add_subdirectory(tests)
 
-# Add executables for get_domain, register_email, and check_inbox
-add_executable(get_domain src/get_domain.cpp)
-add_executable(register_email src/register_email.cpp)
-add_executable(check_inbox src/check_inbox.cpp)
+# Add documentation directory (if needed)
+if(EXISTS "${CMAKE_SOURCE_DIR}/docs/CMakeLists.txt")
+    add_subdirectory(docs)
+endif()
 
-# Link MailTM and required libraries to each executable
-target_link_libraries(get_domain MailTM)
-target_link_libraries(register_email MailTM)
-target_link_libraries(check_inbox MailTM)
+# Print summary
+message(STATUS "Project configuration complete.")

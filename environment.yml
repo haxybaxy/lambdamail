@@ -16,3 +16,4 @@ dependencies:
   # Development tools
   - ninja
   - ccache
+  - sfml
