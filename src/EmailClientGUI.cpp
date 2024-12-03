@@ -10,24 +10,35 @@ EmailClientGUI::EmailClientGUI()
     , scrollOffset(0)
     , isGenerating(false)
     , isCustomUsername(false)
-    , isInputActive(false) {
+    , isInputActive(false)
+    , isPopupOpen(false)
+    , selectedMessageIndex(-1)
+    , popupScrollOffset(0) {
 
+    // Try multiple font paths and use a more complete font
     const std::vector<std::string> fontPaths = {
+        "resources/fonts/NotoSans-Regular.ttf",  // Noto Sans supports more characters
+        "../resources/fonts/NotoSans-Regular.ttf",
+        "./resources/fonts/NotoSans-Regular.ttf",
         "resources/fonts/Arial.ttf",
         "../resources/fonts/Arial.ttf",
-        "./resources/fonts/Arial.ttf"
+        "./resources/fonts/Arial.ttf",
+        "resources/fonts/Roboto-Regular.ttf",
+        "../resources/fonts/Roboto-Regular.ttf",
+        "./resources/fonts/Roboto-Regular.ttf"
     };
 
     bool fontLoaded = false;
     for (const auto& path : fontPaths) {
         if (font.loadFromFile(path)) {
             fontLoaded = true;
+            std::cout << "Loaded font from: " << path << std::endl;
             break;
         }
     }
 
     if (!fontLoaded) {
-        throw std::runtime_error("Could not load font from any path");
+        throw std::runtime_error("Failed to load font");
     }
 
     inputPrompt.setFont(font);
@@ -330,9 +341,9 @@ void EmailClientGUI::drawMessages() {
         yPos += 130;
     }
 
-    // Add scroll indicators if needed
-    if (messages.size() > 4) {  // If there are more messages than fit in view
-        sf::Text scrollIndicator("▼", font, 20);
+    // Scroll indicator using UTF-8 symbol
+    if (messages.size() > 4) {
+        sf::Text scrollIndicator(L"▼", font, 20);  // Using wide string for Unicode
         scrollIndicator.setPosition(770, 560);
         scrollIndicator.setFillColor(sf::Color(150, 150, 150));
         window.draw(scrollIndicator);
@@ -565,7 +576,8 @@ void EmailClientGUI::drawMessagePopup() {
     closeButton.setFillColor(sf::Color(231, 76, 60));
     window.draw(closeButton);
 
-    sf::Text closeText("×", font, 20);
+    // Close button text using UTF-8 symbol
+    sf::Text closeText(L"×", font, 20);  // Using wide string for Unicode
     closeText.setPosition(710, 65);
     closeText.setFillColor(sf::Color::White);
     window.draw(closeText);
