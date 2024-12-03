@@ -66,9 +66,9 @@ void EmailClientGUI::generateEmail() {
         // Validate custom username
         if (!isValidUsername(customUsername)) {
             std::cerr << "Invalid username. Username must:\n"
-                     << "- Start with a letter\n"
-                     << "- Be at least 3 characters long\n"
-                     << "- Contain only letters, numbers, dots, underscores, or hyphens"
+                     << "• Start with a letter\n"
+                     << "• Be at least 3 characters long\n"
+                     << "• Contain only letters, numbers, dots, underscores, or hyphens"
                      << std::endl;
             return;
         }
@@ -399,6 +399,35 @@ void EmailClientGUI::handleMouseClick(int x, int y) {
         }
     }
 
+    // If popup is open, handle popup-specific clicks
+    if (isPopupOpen) {
+        // Close button (top-right of popup)
+        if (x >= 700 && x <= 730 && y >= 60 && y <= 90) {
+            std::cout << "Closing popup" << std::endl;
+            isPopupOpen = false;
+            selectedMessageIndex = -1;
+            return;
+        }
+        return; // Ignore other clicks when popup is open
+    }
+
+    // Check for message clicks when emails are shown
+    if (isEmailGenerated) {
+        float clickY = y + scrollOffset; // Adjust for scrolling
+        if (x >= 20 && x <= 780 && clickY >= 110) {
+            int messageIndex = (clickY - 110) / 90; // 90 is the height of each message preview
+            std::cout << "Calculated message index: " << messageIndex << std::endl;
+
+            if (messageIndex >= 0 && messageIndex < messages.size()) {
+                std::cout << "Opening popup for message " << messageIndex << std::endl;
+                isPopupOpen = true;
+                selectedMessageIndex = messageIndex;
+                popupScrollOffset = 0;
+                return;
+            }
+        }
+    }
+
     if (!isEmailGenerated) {
         // Toggle button (150, 180, 350, 220)
         if (x >= 150 && x <= 350 && y >= 180 && y <= 220) {
@@ -466,6 +495,10 @@ void EmailClientGUI::run() {
                     }
                     break;
 
+                case sf::Event::MouseWheelScrolled:
+                    handleScroll(event.mouseWheelScroll.delta);
+                    break;
+
                 case sf::Event::TextEntered:
                     if (isInputActive && !isEmailGenerated) {
                         if (event.text.unicode == '\b') {
@@ -479,10 +512,6 @@ void EmailClientGUI::run() {
                     }
                     break;
 
-                case sf::Event::MouseWheelScrolled:
-                    handleScroll(event.mouseWheelScroll.delta);
-                    break;
-
                 default:
                     break;
             }
@@ -492,6 +521,9 @@ void EmailClientGUI::run() {
         drawMainInterface();
         if (isEmailGenerated) {
             drawMessages();
+            if (isPopupOpen) {
+                drawMessagePopup();
+            }
         }
         window.display();
     }
@@ -505,4 +537,102 @@ void EmailClientGUI::openUrl(const std::string& url) {
     #else
         system(("xdg-open " + url).c_str());
     #endif
+}
+
+void EmailClientGUI::drawMessagePopup() {
+    if (!isPopupOpen || selectedMessageIndex < 0 || selectedMessageIndex >= messages.size()) {
+        return;
+    }
+
+    // Semi-transparent background overlay
+    sf::RectangleShape overlay(sf::Vector2f(800, 600));
+    overlay.setFillColor(sf::Color(0, 0, 0, 180));
+    window.draw(overlay);
+
+    // Popup window
+    sf::RectangleShape popup(sf::Vector2f(600, 400));
+    popup.setPosition(100, 100);
+    popup.setFillColor(sf::Color(45, 49, 57));
+    popup.setOutlineThickness(2);
+    popup.setOutlineColor(sf::Color(70, 74, 82));
+    window.draw(popup);
+
+    const auto& message = messages[selectedMessageIndex];
+
+    // Close button
+    sf::RectangleShape closeButton(sf::Vector2f(30, 30));
+    closeButton.setPosition(700, 60);
+    closeButton.setFillColor(sf::Color(231, 76, 60));
+    window.draw(closeButton);
+
+    sf::Text closeText("×", font, 20);
+    closeText.setPosition(710, 65);
+    closeText.setFillColor(sf::Color::White);
+    window.draw(closeText);
+
+    // Message content
+    float yPos = 120 - popupScrollOffset;
+
+    // From
+    sf::Text fromText("From: " + message["from"]["address"].asString(), font, 16);
+    fromText.setPosition(120, yPos);
+    fromText.setFillColor(sf::Color::White);
+    window.draw(fromText);
+    yPos += 30;
+
+    // Subject
+    sf::Text subjectText("Subject: " + message["subject"].asString(), font, 16);
+    subjectText.setPosition(120, yPos);
+    subjectText.setFillColor(sf::Color::White);
+    window.draw(subjectText);
+    yPos += 40;
+
+    // Body
+    std::string bodyText;
+    if (message.isMember("text")) {
+        bodyText = message["text"].asString();
+    } else if (message.isMember("html")) {
+        bodyText = stripHtmlExceptLinks(message["html"].asString());
+    } else if (message.isMember("intro")) {
+        bodyText = message["intro"].asString();
+    }
+
+    // Draw wrapped body text
+    std::vector<std::string> words = splitIntoWords(bodyText);
+    std::string currentLine;
+    float lineX = 120;
+    float maxWidth = 540;
+
+    for (const auto& word : words) {
+        bool isLink = word.find("http://") == 0 || word.find("https://") == 0;
+
+        sf::Text testText(currentLine + " " + word, font, 14);
+        if (testText.getLocalBounds().width > maxWidth && !currentLine.empty()) {
+            sf::Text lineText(currentLine, font, 14);
+            lineText.setPosition(lineX, yPos);
+            lineText.setFillColor(sf::Color(200, 200, 200));
+            window.draw(lineText);
+            yPos += 20;
+            currentLine = word;
+            lineX = 120;
+        } else {
+            if (!currentLine.empty()) currentLine += " ";
+            currentLine += word;
+        }
+
+        if (isLink) {
+            sf::Text linkText(word, font, 14);
+            linkText.setPosition(lineX, yPos);
+            linkText.setFillColor(sf::Color(100, 149, 237));
+            linkText.setStyle(sf::Text::Underlined);
+
+            ClickableLink link;
+            link.bounds = linkText.getGlobalBounds();
+            link.url = word;
+            activeLinks.push_back(link);
+
+            window.draw(linkText);
+            lineX += linkText.getGlobalBounds().width + 5;
+        }
+    }
 }

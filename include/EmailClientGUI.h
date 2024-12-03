@@ -59,6 +59,14 @@ private:
     std::vector<std::string> splitIntoWords(const std::string& text);
     void openUrl(const std::string& url);
 
+    // Add to private section:
+    bool isPopupOpen;
+    int selectedMessageIndex;
+    float popupScrollOffset;
+
+    void drawMessagePopup();
+    void closePopup();
+
 public:
     EmailClientGUI();
     void run();
