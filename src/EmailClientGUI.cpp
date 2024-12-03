@@ -555,12 +555,35 @@ void EmailClientGUI::drawMessagePopup() {
         return;
     }
 
-    // Semi-transparent background overlay
+    // Debug the entire message content
+    const auto& message = messages[selectedMessageIndex];
+    std::cout << "\nDEBUG - Message Structure:" << std::endl;
+    std::cout << "Message type: " << message.type() << std::endl;
+
+    if (message.isObject()) {
+        std::cout << "Message keys:" << std::endl;
+        for (const auto& key : message.getMemberNames()) {
+            std::cout << "- " << key << " (type: " << message[key].type() << ")" << std::endl;
+            if (key == "from") {
+                std::cout << "  From structure:" << std::endl;
+                if (message[key].isObject()) {
+                    for (const auto& fromKey : message[key].getMemberNames()) {
+                        std::cout << "    " << fromKey << " (type: " << message[key][fromKey].type() << ")" << std::endl;
+                    }
+                } else {
+                    std::cout << "  'from' is not an object!" << std::endl;
+                }
+            }
+        }
+    } else {
+        std::cout << "Message is not an object!" << std::endl;
+    }
+
+    // Draw the popup UI
     sf::RectangleShape overlay(sf::Vector2f(800, 600));
     overlay.setFillColor(sf::Color(0, 0, 0, 180));
     window.draw(overlay);
 
-    // Popup window
     sf::RectangleShape popup(sf::Vector2f(600, 400));
     popup.setPosition(100, 100);
     popup.setFillColor(sf::Color(45, 49, 57));
@@ -568,7 +591,71 @@ void EmailClientGUI::drawMessagePopup() {
     popup.setOutlineColor(sf::Color(70, 74, 82));
     window.draw(popup);
 
-    const auto& message = messages[selectedMessageIndex];
+    float yPos = 120 - popupScrollOffset;
+
+    // From
+    if (message.isMember("from") && message["from"].isObject() && message["from"].isMember("address")) {
+        try {
+            std::string fromAddress = message["from"]["address"].asString();
+            sf::Text fromText("From: " + fromAddress, font, 16);
+            fromText.setPosition(120, yPos);
+            fromText.setFillColor(sf::Color::White);
+            window.draw(fromText);
+            yPos += 30;
+        } catch (const std::exception& e) {
+            std::cout << "Error converting from address: " << e.what() << std::endl;
+        }
+    } else {
+        std::cout << "Invalid 'from' structure" << std::endl;
+    }
+
+    // Subject
+    if (message.isMember("subject")) {
+        try {
+            std::string subject = message["subject"].asString();
+            sf::Text subjectText("Subject: " + subject, font, 16);
+            subjectText.setPosition(120, yPos);
+            subjectText.setFillColor(sf::Color::White);
+            window.draw(subjectText);
+            yPos += 40;
+        } catch (const std::exception& e) {
+            std::cout << "Error converting subject: " << e.what() << std::endl;
+        }
+    }
+
+    // Body text
+    if (message.isMember("text")) {
+        try {
+            sf::Text bodyHeader("Message:", font, 14);
+            bodyHeader.setPosition(120, yPos);
+            bodyHeader.setFillColor(sf::Color(150, 150, 150));
+            window.draw(bodyHeader);
+            yPos += 25;
+
+            std::string bodyText = message["text"].asString();
+            drawWrappedText(bodyText, 120, yPos, 540, 14, sf::Color(200, 200, 200));
+            yPos += calculateTextHeight(bodyText, 540, 14) + 20;
+        } catch (const std::exception& e) {
+            std::cout << "Error converting text content: " << e.what() << std::endl;
+        }
+    }
+
+    // HTML content
+    if (message.isMember("html")) {
+        try {
+            sf::Text htmlHeader("HTML Content:", font, 14);
+            htmlHeader.setPosition(120, yPos);
+            htmlHeader.setFillColor(sf::Color(150, 150, 150));
+            window.draw(htmlHeader);
+            yPos += 25;
+
+            std::string htmlContent = message["html"].asString();
+            std::string strippedHtml = stripHtmlExceptLinks(htmlContent);
+            drawWrappedText(strippedHtml, 120, yPos, 540, 14, sf::Color(200, 200, 200));
+        } catch (const std::exception& e) {
+            std::cout << "Error converting HTML content: " << e.what() << std::endl;
+        }
+    }
 
     // Close button
     sf::RectangleShape closeButton(sf::Vector2f(30, 30));
@@ -576,65 +663,38 @@ void EmailClientGUI::drawMessagePopup() {
     closeButton.setFillColor(sf::Color(231, 76, 60));
     window.draw(closeButton);
 
-    // Close button text using UTF-8 symbol
-    sf::Text closeText(L"×", font, 20);  // Using wide string for Unicode
+    sf::Text closeText(L"×", font, 20);
     closeText.setPosition(710, 65);
     closeText.setFillColor(sf::Color::White);
     window.draw(closeText);
+}
 
-    // Message content
-    float yPos = 120 - popupScrollOffset;
-
-    // From
-    sf::Text fromText("From: " + message["from"]["address"].asString(), font, 16);
-    fromText.setPosition(120, yPos);
-    fromText.setFillColor(sf::Color::White);
-    window.draw(fromText);
-    yPos += 30;
-
-    // Subject
-    sf::Text subjectText("Subject: " + message["subject"].asString(), font, 16);
-    subjectText.setPosition(120, yPos);
-    subjectText.setFillColor(sf::Color::White);
-    window.draw(subjectText);
-    yPos += 40;
-
-    // Body
-    std::string bodyText;
-    if (message.isMember("text")) {
-        bodyText = message["text"].asString();
-    } else if (message.isMember("html")) {
-        bodyText = stripHtmlExceptLinks(message["html"].asString());
-    } else if (message.isMember("intro")) {
-        bodyText = message["intro"].asString();
-    }
-
-    // Draw wrapped body text
-    std::vector<std::string> words = splitIntoWords(bodyText);
+void EmailClientGUI::drawWrappedText(const std::string& text, float x, float y, float maxWidth, unsigned int fontSize, const sf::Color& color) {
+    std::vector<std::string> words = splitIntoWords(text);
     std::string currentLine;
-    float lineX = 120;
-    float maxWidth = 540;
+    float lineX = x;
+    float currentY = y;
 
     for (const auto& word : words) {
         bool isLink = word.find("http://") == 0 || word.find("https://") == 0;
 
-        sf::Text testText(currentLine + " " + word, font, 14);
+        sf::Text testText(currentLine + " " + word, font, fontSize);
         if (testText.getLocalBounds().width > maxWidth && !currentLine.empty()) {
-            sf::Text lineText(currentLine, font, 14);
-            lineText.setPosition(lineX, yPos);
-            lineText.setFillColor(sf::Color(200, 200, 200));
+            sf::Text lineText(currentLine, font, fontSize);
+            lineText.setPosition(lineX, currentY);
+            lineText.setFillColor(color);
             window.draw(lineText);
-            yPos += 20;
+            currentY += fontSize + 6;
             currentLine = word;
-            lineX = 120;
+            lineX = x;
         } else {
             if (!currentLine.empty()) currentLine += " ";
             currentLine += word;
         }
 
         if (isLink) {
-            sf::Text linkText(word, font, 14);
-            linkText.setPosition(lineX, yPos);
+            sf::Text linkText(word, font, fontSize);
+            linkText.setPosition(lineX, currentY);
             linkText.setFillColor(sf::Color(100, 149, 237));
             linkText.setStyle(sf::Text::Underlined);
 
@@ -647,4 +707,31 @@ void EmailClientGUI::drawMessagePopup() {
             lineX += linkText.getGlobalBounds().width + 5;
         }
     }
+
+    // Draw the last line if there is one
+    if (!currentLine.empty()) {
+        sf::Text lineText(currentLine, font, fontSize);
+        lineText.setPosition(lineX, currentY);
+        lineText.setFillColor(color);
+        window.draw(lineText);
+    }
+}
+
+float EmailClientGUI::calculateTextHeight(const std::string& text, float maxWidth, unsigned int fontSize) {
+    std::vector<std::string> words = splitIntoWords(text);
+    std::string currentLine;
+    int numLines = 1;
+
+    for (const auto& word : words) {
+        sf::Text testText(currentLine + " " + word, font, fontSize);
+        if (testText.getLocalBounds().width > maxWidth && !currentLine.empty()) {
+            numLines++;
+            currentLine = word;
+        } else {
+            if (!currentLine.empty()) currentLine += " ";
+            currentLine += word;
+        }
+    }
+
+    return numLines * (fontSize + 6);  // Include line spacing
 }

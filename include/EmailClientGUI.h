@@ -67,6 +67,10 @@ private:
     void drawMessagePopup();
     void closePopup();
 
+    // Add to private section:
+    void drawWrappedText(const std::string& text, float x, float y, float maxWidth, unsigned int fontSize, const sf::Color& color);
+    float calculateTextHeight(const std::string& text, float maxWidth, unsigned int fontSize);
+
 public:
     EmailClientGUI();
     void run();
